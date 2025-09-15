@@ -1,0 +1,24 @@
+{{- if and .Values.realtime.enabled .Values.realtime.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "supabase.fullname" . }}-realtime
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: realtime
+  {{- with .Values.realtime.podDisruptionBudget.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.realtime.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.realtime.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.realtime.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.realtime.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "supabase.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: realtime
+{{- end }}

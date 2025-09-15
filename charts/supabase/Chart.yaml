@@ -1,0 +1,70 @@
+# Copyright 2024 Bibek Rauniyar
+# SPDX-License-Identifier: MIT
+#
+# Licensed under the MIT License (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://opensource.org/licenses/MIT
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v2
+name: supabase
+description: The open source Firebase alternative.
+
+# A chart can be either an 'application' or a 'library' chart.
+#
+# Application charts are a collection of templates that can be packaged into versioned archives
+# to be deployed.
+#
+# Library charts provide useful utilities or functions for the chart developer. They're included as
+# a dependency of application charts to inject those utilities and functions into the rendering
+# pipeline. Library charts do not define any templates and therefore cannot be deployed.
+type: application
+
+# This is the chart version. This version number should be incremented each time you make changes
+# to the chart and its templates, including the app version.
+# Versions are expected to follow Semantic Versioning (https://semver.org/)
+version: 0.1.3
+
+# This is the version number of the application being deployed. This version number should be
+# incremented each time you make changes to the application. Versions are not expected to
+# follow Semantic Versioning. They should reflect the version the application is using.
+# It is recommended to use it with quotes.
+# Not used because too difficult to follow correctly
+# appVersion: "1.16.0"
+
+# A URL to an SVG or PNG image to be used as an icon
+icon: https://avatars.githubusercontent.com/u/54469796?s=280&v=4
+
+# Dependencies for external charts
+dependencies:
+  - name: postgresql
+    version: "12.5.6"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled
+    tags:
+      - database
+  - name: minio
+    version: "12.6.4"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: minio.enabled
+    tags:
+      - storage
+  - name: kong
+    version: "2.13.1"
+    repository: "https://charts.konghq.com"
+    condition: kong.enabled
+    tags:
+      - gateway
+  - name: vector
+    version: "0.22.0"
+    repository: "https://helm.vector.dev"
+    condition: vector.enabled
+    tags:
+      - logging

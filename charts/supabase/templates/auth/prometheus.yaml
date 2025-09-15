@@ -1,0 +1,101 @@
+{{- if and .Values.auth.enabled .Values.prometheus.enabled .Values.auth.prometheus.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: {{ include "supabase.fullname" . }}-auth-prometheus
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: auth
+    prometheus: auth
+  {{- with .Values.prometheus.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.auth.prometheus.replicas | default 1 }}
+  retention: {{ .Values.auth.prometheus.retention | default "30d" }}
+  retentionSize: {{ .Values.auth.prometheus.retentionSize | default "50GiB" }}
+
+  serviceAccountName: {{ include "supabase.serviceAccountName" . }}-auth
+
+  serviceMonitorSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "supabase.name" . }}
+      app.kubernetes.io/component: auth
+
+  serviceMonitorNamespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+
+  ruleSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "supabase.name" . }}
+      app.kubernetes.io/component: auth
+      prometheus: auth
+
+  ruleNamespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+
+  {{- if .Values.auth.prometheus.resources }}
+  resources:
+    {{- toYaml .Values.auth.prometheus.resources | nindent 4 }}
+  {{- end }}
+
+  {{- if .Values.auth.prometheus.storage }}
+  storage:
+    {{- toYaml .Values.auth.prometheus.storage | nindent 4 }}
+  {{- end }}
+
+  {{- if .Values.auth.prometheus.nodeSelector }}
+  nodeSelector:
+    {{- toYaml .Values.auth.prometheus.nodeSelector | nindent 4 }}
+  {{- end }}
+
+  {{- if .Values.auth.prometheus.tolerations }}
+  tolerations:
+    {{- toYaml .Values.auth.prometheus.tolerations | nindent 4 }}
+  {{- end }}
+
+  {{- if .Values.auth.prometheus.affinity }}
+  affinity:
+    {{- toYaml .Values.auth.prometheus.affinity | nindent 4 }}
+  {{- end }}
+
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 2000
+
+  {{- if .Values.auth.prometheus.additionalScrapeConfigs }}
+  additionalScrapeConfigs:
+    name: {{ include "supabase.fullname" . }}-auth-additional-scrape-configs
+    key: prometheus-additional.yaml
+  {{- end }}
+
+  {{- if .Values.auth.prometheus.remoteWrite }}
+  remoteWrite:
+    {{- toYaml .Values.auth.prometheus.remoteWrite | nindent 4 }}
+  {{- end }}
+
+  {{- if .Values.auth.prometheus.remoteRead }}
+  remoteRead:
+    {{- toYaml .Values.auth.prometheus.remoteRead | nindent 4 }}
+  {{- end }}
+
+  {{- if .Values.auth.prometheus.externalLabels }}
+  externalLabels:
+    {{- toYaml .Values.auth.prometheus.externalLabels | nindent 4 }}
+  {{- end }}
+
+  logLevel: {{ .Values.auth.prometheus.logLevel | default "info" }}
+  logFormat: {{ .Values.auth.prometheus.logFormat | default "logfmt" }}
+
+  {{- if .Values.auth.prometheus.enableAdminAPI }}
+  enableAdminAPI: {{ .Values.auth.prometheus.enableAdminAPI }}
+  {{- end }}
+
+  {{- if .Values.auth.prometheus.walCompression }}
+  walCompression: {{ .Values.auth.prometheus.walCompression }}
+  {{- end }}
+{{- end }}

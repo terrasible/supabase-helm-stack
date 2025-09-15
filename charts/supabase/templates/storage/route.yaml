@@ -1,0 +1,55 @@
+{{- if and .Values.storage.enabled .Values.storage.route .Values.storage.route.enabled }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "supabase.fullname" . }}-storage
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: storage
+  {{- if and .Values.storage.route .Values.storage.route.annotations }}
+  {{- with .Values.storage.route.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+spec:
+  {{- if .Values.storage.route.host }}
+  host: {{ .Values.storage.route.host }}
+  {{- end }}
+  {{- if .Values.storage.route.subdomain }}
+  subdomain: {{ .Values.storage.route.subdomain }}
+  {{- end }}
+  {{- if .Values.storage.route.path }}
+  path: {{ .Values.storage.route.path }}
+  {{- end }}
+  to:
+    kind: Service
+    name: {{ include "supabase.fullname" . }}-storage
+    weight: 100
+  port:
+    targetPort: {{ .Values.storage.service.targetPort | default "http" }}
+  {{- if .Values.storage.route.tls }}
+  tls:
+    {{- if .Values.storage.route.tls.termination }}
+    termination: {{ .Values.storage.route.tls.termination }}
+    {{- end }}
+    {{- if .Values.storage.route.tls.certificate }}
+    certificate: {{ .Values.storage.route.tls.certificate }}
+    {{- end }}
+    {{- if .Values.storage.route.tls.key }}
+    key: {{ .Values.storage.route.tls.key }}
+    {{- end }}
+    {{- if .Values.storage.route.tls.caCertificate }}
+    caCertificate: {{ .Values.storage.route.tls.caCertificate }}
+    {{- end }}
+    {{- if .Values.storage.route.tls.destinationCACertificate }}
+    destinationCACertificate: {{ .Values.storage.route.tls.destinationCACertificate }}
+    {{- end }}
+    {{- if .Values.storage.route.tls.insecureEdgeTerminationPolicy }}
+    insecureEdgeTerminationPolicy: {{ .Values.storage.route.tls.insecureEdgeTerminationPolicy }}
+    {{- end }}
+  {{- end }}
+  {{- if .Values.storage.route.wildcardPolicy }}
+  wildcardPolicy: {{ .Values.storage.route.wildcardPolicy }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,118 @@
+{{- if .Values.meta.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "supabase.fullname" . }}-meta
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: meta
+  {{- if .Values.meta.configMap }}
+  {{- with .Values.meta.configMap.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+data:
+  # Database Configuration
+  PG_META_DB_HOST: {{ (.Values.meta.database).host | quote }}
+  PG_META_DB_PORT: {{ (.Values.meta.database).port | quote }}
+  PG_META_DB_NAME: {{ (.Values.meta.database).name | quote }}
+  PG_META_DB_USER: {{ (.Values.meta.database).user | quote }}
+  PG_META_DB_SSL: {{ (.Values.meta.database).ssl | toString | quote }}
+
+  # Server Configuration
+  PG_META_PORT: {{ .Values.meta.service.port | quote }}
+
+  # SSL Configuration
+  {{- if (.Values.meta.database).rootCert }}
+  PG_META_DB_ROOT_CERT: {{ (.Values.meta.database).rootCert | quote }}
+  {{- end }}
+
+  # Connection Pool Configuration
+  {{- if (.Values.meta.database).poolSize }}
+  PG_META_DB_POOL_SIZE: {{ (.Values.meta.database).poolSize | quote }}
+  {{- end }}
+
+  # Timeout Configuration
+  {{- if (.Values.meta.database).timeout }}
+  PG_META_DB_TIMEOUT: {{ (.Values.meta.database).timeout | quote }}
+  {{- end }}
+
+  # Schema Configuration
+  {{- if (.Values.meta.database).schema }}
+  PG_META_DB_SCHEMA: {{ (.Values.meta.database).schema | quote }}
+  {{- end }}
+
+  # Logging Configuration
+  {{- if (.Values.meta.logging).level }}
+  LOG_LEVEL: {{ (.Values.meta.logging).level | quote }}
+  {{- end }}
+
+  {{- if (.Values.meta.logging).format }}
+  LOG_FORMAT: {{ (.Values.meta.logging).format | quote }}
+  {{- end }}
+
+  # Metrics Configuration
+  {{- if (.Values.meta.metrics).enabled }}
+  METRICS_ENABLED: "true"
+  METRICS_PORT: {{ (.Values.meta.metrics).port | quote }}
+  {{- if (.Values.meta.metrics).path }}
+  METRICS_PATH: {{ (.Values.meta.metrics).path | quote }}
+  {{- end }}
+  {{- end }}
+
+  # Health Check Configuration
+  {{- if (.Values.meta.healthCheck).enabled }}
+  HEALTH_CHECK_ENABLED: "true"
+  {{- if (.Values.meta.healthCheck).path }}
+  HEALTH_CHECK_PATH: {{ (.Values.meta.healthCheck).path | quote }}
+  {{- end }}
+  {{- end }}
+
+  # CORS Configuration
+  {{- if (.Values.meta.cors).enabled }}
+  CORS_ENABLED: "true"
+  {{- if (.Values.meta.cors).allowedOrigins }}
+  CORS_ALLOWED_ORIGINS: {{ join "," (.Values.meta.cors).allowedOrigins | quote }}
+  {{- end }}
+  {{- if (.Values.meta.cors).allowedMethods }}
+  CORS_ALLOWED_METHODS: {{ join "," (.Values.meta.cors).allowedMethods | quote }}
+  {{- end }}
+  {{- if (.Values.meta.cors).allowedHeaders }}
+  CORS_ALLOWED_HEADERS: {{ join "," (.Values.meta.cors).allowedHeaders | quote }}
+  {{- end }}
+  {{- if (.Values.meta.cors).allowCredentials }}
+  CORS_ALLOW_CREDENTIALS: {{ (.Values.meta.cors).allowCredentials | quote }}
+  {{- end }}
+  {{- end }}
+
+  # Rate Limiting Configuration
+  {{- if (.Values.meta.rateLimit).enabled }}
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_MAX: {{ (.Values.meta.rateLimit).max | quote }}
+  RATE_LIMIT_WINDOW: {{ (.Values.meta.rateLimit).window | quote }}
+  {{- end }}
+
+  # Cache Configuration
+  {{- if (.Values.meta.cache).enabled }}
+  CACHE_ENABLED: "true"
+  CACHE_TTL: {{ (.Values.meta.cache).ttl | quote }}
+  {{- if (.Values.meta.cache).maxSize }}
+  CACHE_MAX_SIZE: {{ (.Values.meta.cache).maxSize | quote }}
+  {{- end }}
+  {{- end }}
+
+  # Additional configuration from values
+  {{- if (.Values.meta).config }}
+  {{- range $key, $value := (.Values.meta).config }}
+  {{ $key }}: {{ $value | toString | quote }}
+  {{- end }}
+  {{- end }}
+
+  # Additional ConfigMaps
+  {{- if (.Values.meta).extraConfigMaps }}
+  {{- range $key, $value := (.Values.meta).extraConfigMaps }}
+  {{ $key }}: {{ $value | toString | quote }}
+  {{- end }}
+  {{- end }}
+{{- end }}

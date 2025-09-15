@@ -1,0 +1,51 @@
+{{- if and .Values.storage.enabled .Values.storage.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "supabase.fullname" . }}-storage
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: storage
+  {{- with .Values.storage.autoscaling.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "supabase.fullname" . }}-storage
+  minReplicas: {{ .Values.storage.autoscaling.minReplicas | default 1 }}
+  maxReplicas: {{ .Values.storage.autoscaling.maxReplicas | default 10 }}
+  metrics:
+    {{- if .Values.storage.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.storage.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.storage.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.storage.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+    {{- with .Values.storage.autoscaling.customMetrics }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- if .Values.storage.autoscaling.behavior }}
+  behavior:
+    {{- with .Values.storage.autoscaling.behavior.scaleDown }}
+    scaleDown:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.storage.autoscaling.behavior.scaleUp }}
+    scaleUp:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- end }}
+{{- end }}

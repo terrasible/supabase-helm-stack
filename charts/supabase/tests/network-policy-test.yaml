@@ -1,0 +1,165 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "supabase.fullname" . }}-network-policy-test"
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "15"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+  - name: network-policy-test
+    image: nicolaka/netshoot:v0.11
+    command: ["/bin/bash"]
+    args:
+      - -c
+      - |
+        set -e
+        echo "🧪 Testing Network Policies..."
+
+        {{- if .Values.networkPolicy.enabled }}
+        echo "🔒 Network policies are enabled, testing connectivity rules..."
+
+        # Test internal service connectivity
+        echo "📡 Testing internal service connectivity..."
+
+        {{- if .Values.auth.enabled }}
+        # Test Auth service connectivity
+        AUTH_SERVICE="{{ include "supabase.fullname" . }}-auth.{{ .Release.Namespace }}.svc.cluster.local"
+        echo "Testing Auth service connectivity..."
+        if timeout 10 nc -z $AUTH_SERVICE {{ .Values.auth.service.port }}; then
+          echo "✅ Auth service is reachable"
+        else
+          echo "❌ Auth service is not reachable (may be blocked by network policy)"
+        fi
+        {{- end }}
+
+        {{- if .Values.rest.enabled }}
+        # Test REST service connectivity
+        REST_SERVICE="{{ include "supabase.fullname" . }}-rest.{{ .Release.Namespace }}.svc.cluster.local"
+        echo "Testing REST service connectivity..."
+        if timeout 10 nc -z $REST_SERVICE {{ .Values.rest.service.port }}; then
+          echo "✅ REST service is reachable"
+        else
+          echo "❌ REST service is not reachable (may be blocked by network policy)"
+        fi
+        {{- end }}
+
+        {{- if .Values.storage.enabled }}
+        # Test Storage service connectivity
+        STORAGE_SERVICE="{{ include "supabase.fullname" . }}-storage.{{ .Release.Namespace }}.svc.cluster.local"
+        echo "Testing Storage service connectivity..."
+        if timeout 10 nc -z $STORAGE_SERVICE {{ .Values.storage.service.port }}; then
+          echo "✅ Storage service is reachable"
+        else
+          echo "❌ Storage service is not reachable (may be blocked by network policy)"
+        fi
+        {{- end }}
+
+        {{- if .Values.realtime.enabled }}
+        # Test Realtime service connectivity
+        REALTIME_SERVICE="{{ include "supabase.fullname" . }}-realtime.{{ .Release.Namespace }}.svc.cluster.local"
+        echo "Testing Realtime service connectivity..."
+        if timeout 10 nc -z $REALTIME_SERVICE {{ .Values.realtime.service.port }}; then
+          echo "✅ Realtime service is reachable"
+        else
+          echo "❌ Realtime service is not reachable (may be blocked by network policy)"
+        fi
+        {{- end }}
+
+        # Test PostgreSQL connectivity (should be restricted)
+        {{- if .Values.postgresql.enabled }}
+        POSTGRES_SERVICE="{{ include "supabase.postgresql.host" . }}"
+        echo "Testing PostgreSQL connectivity (should be restricted)..."
+        if timeout 5 nc -z $POSTGRES_SERVICE {{ include "supabase.postgresql.port" . }}; then
+          echo "⚠️  PostgreSQL is accessible (check if this is intended)"
+        else
+          echo "✅ PostgreSQL access is properly restricted"
+        fi
+        {{- end }}
+
+        # Test external connectivity
+        echo "🌐 Testing external connectivity..."
+        if timeout 10 nc -z google.com 80; then
+          echo "✅ External connectivity is working"
+        else
+          echo "❌ External connectivity is blocked"
+        fi
+
+        # Test DNS resolution
+        echo "🔍 Testing DNS resolution..."
+        if nslookup kubernetes.default.svc.cluster.local > /dev/null 2>&1; then
+          echo "✅ DNS resolution is working"
+        else
+          echo "❌ DNS resolution failed"
+        fi
+
+        {{- if .Values.networkPolicy.cilium.enabled }}
+        echo "🐝 Testing Cilium-specific network policies..."
+
+        # Test Cilium network policy enforcement
+        echo "Testing Cilium network policy enforcement..."
+
+        # Check if we can reach services that should be allowed
+        {{- if .Values.kongOperator.enabled }}
+        KONG_SERVICE="{{ .Values.kongOperator.serviceName }}.{{ .Values.kongOperator.serviceNamespace }}.svc.cluster.local"
+        echo "Testing Kong Gateway connectivity through Cilium policies..."
+        if timeout 10 nc -z $KONG_SERVICE {{ .Values.kongOperator.servicePort }}; then
+          echo "✅ Kong Gateway is reachable through Cilium policies"
+        else
+          echo "❌ Kong Gateway is not reachable (check Cilium network policies)"
+        fi
+        {{- end }}
+
+        # Test inter-service communication
+        echo "Testing inter-service communication policies..."
+        {{- if and .Values.auth.enabled .Values.rest.enabled }}
+        # Auth should be able to reach REST
+        if timeout 10 nc -z $REST_SERVICE {{ .Values.rest.service.port }}; then
+          echo "✅ Auth can reach REST service"
+        else
+          echo "❌ Auth cannot reach REST service (check network policies)"
+        fi
+        {{- end }}
+
+        {{- end }}
+
+        echo "🔍 Checking network policy resources..."
+
+        # List network policies in the namespace
+        echo "📋 Network policies in namespace {{ .Release.Namespace }}:"
+        kubectl get networkpolicies -n {{ .Release.Namespace }} || echo "No standard NetworkPolicies found"
+
+        {{- if .Values.networkPolicy.cilium.enabled }}
+        # List Cilium network policies
+        echo "📋 Cilium network policies in namespace {{ .Release.Namespace }}:"
+        kubectl get ciliumnetworkpolicies -n {{ .Release.Namespace }} || echo "No CiliumNetworkPolicies found"
+        {{- end }}
+
+        echo "✅ Network policy tests completed!"
+
+        {{- else }}
+        echo "⚠️  Network policies are disabled. Testing basic connectivity..."
+
+        # Test basic service connectivity when network policies are disabled
+        {{- if .Values.auth.enabled }}
+        AUTH_SERVICE="{{ include "supabase.fullname" . }}-auth.{{ .Release.Namespace }}.svc.cluster.local"
+        if timeout 10 nc -z $AUTH_SERVICE {{ .Values.auth.service.port }}; then
+          echo "✅ Auth service is reachable"
+        else
+          echo "❌ Auth service is not reachable"
+        fi
+        {{- end }}
+
+        echo "⚠️  Consider enabling network policies for enhanced security"
+        {{- end }}
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi

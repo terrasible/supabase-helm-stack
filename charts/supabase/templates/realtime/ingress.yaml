@@ -1,0 +1,48 @@
+{{- if and .Values.realtime.enabled .Values.realtime.ingress .Values.realtime.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "supabase.fullname" . }}-realtime
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: realtime
+  {{- with .Values.realtime.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.realtime.ingress.ingressClassName }}
+  ingressClassName: {{ .Values.realtime.ingress.ingressClassName }}
+  {{- end }}
+  {{- if .Values.realtime.ingress.tls }}
+  tls:
+    {{- range .Values.realtime.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.realtime.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            {{- if .pathType }}
+            pathType: {{ .pathType }}
+            {{- end }}
+            backend:
+              service:
+                name: {{ include "supabase.fullname" $ }}-realtime
+                port:
+                  {{- if .servicePort }}
+                  number: {{ .servicePort }}
+                  {{- else }}
+                  name: http
+                  {{- end }}
+          {{- end }}
+    {{- end }}
+{{- end }}

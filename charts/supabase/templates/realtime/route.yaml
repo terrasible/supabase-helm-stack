@@ -1,0 +1,57 @@
+{{- if and .Values.realtime.enabled .Values.realtime.route .Values.realtime.route.enabled }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "supabase.fullname" . }}-realtime
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: realtime
+  {{- if .Values.realtime.route }}
+  {{- with .Values.realtime.route.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+spec:
+  {{- if .Values.realtime.route.host }}
+  host: {{ .Values.realtime.route.host }}
+  {{- end }}
+  {{- if .Values.realtime.route.subdomain }}
+  subdomain: {{ .Values.realtime.route.subdomain }}
+  {{- end }}
+  path: {{ .Values.realtime.route.path | default "/realtime/v1" }}
+  to:
+    kind: Service
+    name: {{ include "supabase.fullname" . }}-realtime
+    weight: 100
+  port:
+    targetPort: {{ .Values.realtime.service.targetPort | default "http" }}
+  {{- if .Values.realtime.route.tls }}
+  tls:
+    {{- if .Values.realtime.route.tls.termination }}
+    termination: {{ .Values.realtime.route.tls.termination }}
+    {{- end }}
+    {{- if .Values.realtime.route.tls.insecureEdgeTerminationPolicy }}
+    insecureEdgeTerminationPolicy: {{ .Values.realtime.route.tls.insecureEdgeTerminationPolicy }}
+    {{- end }}
+    {{- if .Values.realtime.route.tls.certificate }}
+    certificate: |
+{{ .Values.realtime.route.tls.certificate | indent 6 }}
+    {{- end }}
+    {{- if .Values.realtime.route.tls.key }}
+    key: |
+{{ .Values.realtime.route.tls.key | indent 6 }}
+    {{- end }}
+    {{- if .Values.realtime.route.tls.caCertificate }}
+    caCertificate: |
+{{ .Values.realtime.route.tls.caCertificate | indent 6 }}
+    {{- end }}
+    {{- if .Values.realtime.route.tls.destinationCACertificate }}
+    destinationCACertificate: |
+{{ .Values.realtime.route.tls.destinationCACertificate | indent 6 }}
+    {{- end }}
+  {{- end }}
+  {{- if .Values.realtime.route.wildcardPolicy }}
+  wildcardPolicy: {{ .Values.realtime.route.wildcardPolicy }}
+  {{- end }}
+{{- end }}

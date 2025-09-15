@@ -1,0 +1,78 @@
+{{- if and .Values.auth.enabled .Values.networkPolicy.enabled .Values.networkPolicy.cilium.enabled }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ include "supabase.fullname" . }}-auth
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: auth
+  {{- with .Values.networkPolicy.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  endpointSelector:
+    matchLabels:
+      {{- include "supabase.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: auth
+  ingress:
+    # Allow ingress from Kong Gateway (via Kong Operator)
+    {{- if .Values.kongOperator.enabled }}
+    - fromEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": {{ .Values.kongOperator.serviceNamespace }}
+            app: kong
+    {{- end }}
+      toPorts:
+        - ports:
+            - port: "{{ .Values.auth.service.port }}"
+              protocol: TCP
+    # Allow ingress for metrics scraping
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: monitoring
+      toPorts:
+        - ports:
+            - port: "9090"
+              protocol: TCP
+    {{- if .Values.networkPolicy.cilium.ingress }}
+    {{- range .Values.networkPolicy.cilium.ingress }}
+    - {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- end }}
+  egress:
+    # Allow egress to database
+    - toEndpoints:
+        - matchLabels:
+            {{- include "supabase.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: postgresql
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+    # Allow DNS resolution
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+    # Allow HTTPS for external services
+    - toFQDNs:
+        - matchName: "*.googleapis.com"
+        - matchName: "*.github.com"
+        - matchPattern: "*.supabase.co"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    {{- if .Values.networkPolicy.cilium.egress }}
+    {{- range .Values.networkPolicy.cilium.egress }}
+    - {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- end }}
+{{- end }}

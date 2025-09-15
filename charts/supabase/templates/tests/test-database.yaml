@@ -1,0 +1,105 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "supabase.fullname" . }}-test-database"
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "2"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: test-database
+      image: postgres:15-alpine
+      env:
+        - name: PGHOST
+          value: {{ .Values.postgresql.host | default (printf "%s-postgresql" (include "supabase.fullname" .)) | quote }}
+        - name: PGPORT
+          value: {{ .Values.postgresql.port | default 5432 | quote }}
+        - name: PGDATABASE
+          value: {{ .Values.postgresql.database | default "postgres" | quote }}
+        - name: PGUSER
+          value: {{ .Values.postgresql.username | default "postgres" | quote }}
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "supabase.secretName" . }}
+              key: {{ if and .Values.secrets .Values.secrets.postgresql }}{{ .Values.secrets.postgresql.passwordKey | default "postgresql-password" }}{{ else }}postgresql-password{{ end }}
+      command: ['sh', '-c']
+      args:
+        - |
+          set -e
+          echo "Testing PostgreSQL database connectivity..."
+
+          # Test basic connection
+          echo "Testing basic database connection..."
+          psql -c "SELECT version();" || exit 1
+          echo "✅ Database connection successful"
+
+          # Test database exists
+          echo "Testing database existence..."
+          psql -c "SELECT datname FROM pg_database WHERE datname = '$PGDATABASE';" | grep -q "$PGDATABASE" || exit 1
+          echo "✅ Database '$PGDATABASE' exists"
+
+          # Test basic permissions
+          echo "Testing basic database permissions..."
+          psql -c "CREATE TABLE IF NOT EXISTS test_table (id SERIAL PRIMARY KEY, test_data TEXT);" || exit 1
+          psql -c "INSERT INTO test_table (test_data) VALUES ('test');" || exit 1
+          psql -c "SELECT * FROM test_table;" || exit 1
+          psql -c "DROP TABLE test_table;" || exit 1
+          echo "✅ Database permissions are working"
+
+          # Test Supabase extensions (if they exist)
+          echo "Testing Supabase extensions..."
+
+          # Check for common Supabase extensions
+          EXTENSIONS="uuid-ossp pgcrypto pgjwt"
+          for ext in $EXTENSIONS; do
+            if psql -c "SELECT 1 FROM pg_extension WHERE extname = '$ext';" | grep -q "1"; then
+              echo "✅ Extension '$ext' is installed"
+            else
+              echo "⚠️ Extension '$ext' is not installed (this may be expected)"
+            fi
+          done
+
+          # Test auth schema (if it exists)
+          if psql -c "SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'auth';" | grep -q "auth"; then
+            echo "✅ Auth schema exists"
+
+            # Test auth.users table (if it exists)
+            if psql -c "SELECT table_name FROM information_schema.tables WHERE table_schema = 'auth' AND table_name = 'users';" | grep -q "users"; then
+              echo "✅ Auth users table exists"
+            fi
+          else
+            echo "⚠️ Auth schema not found (this may be expected for fresh installations)"
+          fi
+
+          # Test storage schema (if it exists)
+          if psql -c "SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'storage';" | grep -q "storage"; then
+            echo "✅ Storage schema exists"
+          else
+            echo "⚠️ Storage schema not found (this may be expected for fresh installations)"
+          fi
+
+          # Test realtime schema (if it exists)
+          if psql -c "SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'realtime';" | grep -q "realtime"; then
+            echo "✅ Realtime schema exists"
+          else
+            echo "⚠️ Realtime schema not found (this may be expected for fresh installations)"
+          fi
+
+          echo "🎉 All database tests completed!"
+  {{- with .Values.nodeSelector }}
+  nodeSelector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.affinity }}
+  affinity:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.tolerations }}
+  tolerations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}

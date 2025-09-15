@@ -1,0 +1,435 @@
+# Kong Gateway deployment for use with Supabase Helm chart
+# This example shows how to deploy Kong Gateway using Kong Operator
+# Apply this before deploying the Supabase chart
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kong-system
+  labels:
+    name: kong-system
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/instance: kong-gateway
+
+---
+# Kong Gateway Configuration
+apiVersion: configuration.konghq.com/v1
+kind: KongIngress
+metadata:
+  name: supabase-kong-ingress
+  namespace: kong-system
+spec:
+  upstream:
+    healthchecks:
+      active:
+        healthy:
+          interval: 30
+          successes: 3
+        unhealthy:
+          interval: 30
+          tcp_failures: 3
+          http_failures: 3
+      passive:
+        healthy:
+          successes: 3
+        unhealthy:
+          tcp_failures: 3
+          http_failures: 3
+  proxy:
+    connect_timeout: 60000
+    read_timeout: 60000
+    write_timeout: 60000
+
+---
+# Kong Gateway Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-gateway
+  namespace: kong-system
+  labels:
+    app: kong
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/instance: kong-gateway
+  annotations:
+    konghq.com/plugins: rate-limiting,cors,request-id
+spec:
+  type: LoadBalancer
+  ports:
+    - name: proxy
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+    - name: proxy-ssl
+      port: 8443
+      targetPort: 8443
+      protocol: TCP
+  selector:
+    app: kong
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/instance: kong-gateway
+
+---
+# Kong Admin API Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-admin
+  namespace: kong-system
+  labels:
+    app: kong
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/instance: kong-gateway
+    app.kubernetes.io/component: admin
+spec:
+  type: ClusterIP
+  ports:
+    - name: admin
+      port: 8001
+      targetPort: 8001
+      protocol: TCP
+    - name: admin-ssl
+      port: 8444
+      targetPort: 8444
+      protocol: TCP
+  selector:
+    app: kong
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/instance: kong-gateway
+
+---
+# Kong Gateway Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong-gateway
+  namespace: kong-system
+  labels:
+    app: kong
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/instance: kong-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kong
+      app.kubernetes.io/name: kong
+      app.kubernetes.io/instance: kong-gateway
+  template:
+    metadata:
+      labels:
+        app: kong
+        app.kubernetes.io/name: kong
+        app.kubernetes.io/instance: kong-gateway
+    spec:
+      serviceAccountName: kong-serviceaccount
+      containers:
+        - name: kong
+          image: kong:3.4
+          env:
+            - name: KONG_DATABASE
+          value: "off"
+        - name: KONG_DECLARATIVE_CONFIG
+          value: "/kong/declarative/kong.yml"
+        - name: KONG_PROXY_ACCESS_LOG
+          value: "/dev/stdout"
+        - name: KONG_ADMIN_ACCESS_LOG
+          value: "/dev/stdout"
+        - name: KONG_PROXY_ERROR_LOG
+          value: "/dev/stderr"
+        - name: KONG_ADMIN_ERROR_LOG
+          value: "/dev/stderr"
+        - name: KONG_ADMIN_LISTEN
+          value: "0.0.0.0:8001"
+        - name: KONG_ADMIN_GUI_URL
+          value: "http://localhost:8002"
+        - name: KONG_PLUGINS
+          value: "bundled,rate-limiting,cors,request-id,prometheus"
+          ports:
+            - name: proxy
+              containerPort: 8000
+              protocol: TCP
+            - name: proxy-ssl
+              containerPort: 8443
+              protocol: TCP
+        - name: admin
+          containerPort: 8001
+          protocol: TCP
+        - name: admin-ssl
+          containerPort: 8444
+          protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: 8001
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /status/ready
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          volumeMounts:
+            - name: kong-config
+              mountPath: /kong/declarative
+              readOnly: true
+      volumes:
+        - name: kong-config
+          configMap:
+            name: kong-declarative-config
+
+---
+# Kong ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kong-serviceaccount
+  namespace: kong-system
+  labels:
+    app: kong
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/instance: kong-gateway
+
+---
+# Kong ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kong-clusterrole
+  labels:
+    app: kong
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/instance: kong-gateway
+rules:
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch", "create", "patch"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "patch", "update"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "patch", "update"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses/status"]
+    verbs: ["update"]
+  - apiGroups: ["configuration.konghq.com"]
+    resources: ["*"]
+    verbs: ["*"]
+
+---
+# Kong ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kong-clusterrolebinding
+  labels:
+    app: kong
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/instance: kong-gateway
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kong-clusterrole
+subjects:
+  - kind: ServiceAccount
+    name: kong-serviceaccount
+    namespace: kong
+
+---
+# Kong Declarative Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-declarative-config
+  namespace: kong-system
+  labels:
+    app: kong
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/instance: kong-gateway
+data:
+  kong.yml: |
+    _format_version: "3.0"
+    _transform: true
+
+    services:
+    - name: supabase-rest
+      url: http://supabase-rest.supabase:3000
+      plugins:
+      - name: cors
+        config:
+          origins:
+          - "*"
+          methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+          headers:
+          - Accept
+          - Accept-Version
+          - Content-Length
+          - Content-MD5
+          - Content-Type
+          - Date
+          - Authorization
+          - X-Client-Info
+          - apikey
+          exposed_headers:
+          - X-Total-Count
+          credentials: true
+          max_age: 3600
+      - name: rate-limiting
+        config:
+          minute: 1000
+          hour: 10000
+
+    - name: supabase-auth
+      url: http://supabase-auth.supabase:9999
+      plugins:
+      - name: cors
+        config:
+          origins:
+          - "*"
+          methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+          headers:
+          - Accept
+          - Accept-Version
+          - Content-Length
+          - Content-MD5
+          - Content-Type
+          - Date
+          - Authorization
+          - X-Client-Info
+          - apikey
+          credentials: true
+          max_age: 3600
+
+    - name: supabase-storage
+      url: http://supabase-storage.supabase:5000
+      plugins:
+      - name: cors
+        config:
+          origins:
+          - "*"
+          methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+          headers:
+          - Accept
+          - Accept-Version
+          - Content-Length
+          - Content-MD5
+          - Content-Type
+          - Date
+          - Authorization
+          - X-Client-Info
+          - apikey
+          - cache-control
+          - x-file-name
+          credentials: true
+          max_age: 3600
+
+    - name: supabase-realtime
+      url: http://supabase-realtime.supabase:4000
+      plugins:
+      - name: cors
+        config:
+          origins:
+          - "*"
+          methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+          headers:
+          - Accept
+          - Accept-Version
+          - Content-Length
+          - Content-MD5
+          - Content-Type
+          - Date
+          - Authorization
+          - X-Client-Info
+          - apikey
+          credentials: true
+          max_age: 3600
+
+    routes:
+    - name: supabase-rest-route
+      service: supabase-rest
+      paths:
+      - /rest/v1
+      strip_path: false
+      preserve_host: true
+
+    - name: supabase-auth-route
+      service: supabase-auth
+      paths:
+      - /auth/v1
+      strip_path: false
+      preserve_host: true
+
+    - name: supabase-storage-route
+      service: supabase-storage
+      paths:
+      - /storage/v1
+      strip_path: false
+      preserve_host: true
+
+    - name: supabase-realtime-route
+      service: supabase-realtime
+      paths:
+      - /realtime/v1
+      strip_path: false
+      preserve_host: true
+
+    plugins:
+    - name: prometheus
+      config:
+        per_consumer: false
+        status_code_metrics: true
+        latency_metrics: true
+        bandwidth_metrics: true
+        upstream_health_metrics: true

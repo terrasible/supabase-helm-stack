@@ -1,0 +1,72 @@
+{{- if .Values.studio.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "supabase.fullname" . }}-studio-config
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: studio
+  {{- if and .Values.studio.configMap .Values.studio.configMap.annotations }}
+  {{- with .Values.studio.configMap.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+data:
+  {{- if .Values.studio.config }}
+  {{- range $key, $value := .Values.studio.config }}
+  {{ $key }}: {{ $value | toString | quote }}
+  {{- end }}
+  {{- else }}
+  # Studio Configuration
+  STUDIO_PG_META_URL: {{ (.Values.studio.config).pgMetaUrl | default (printf "http://%s-meta:8080" (include "supabase.fullname" .)) }}
+  SUPABASE_URL: {{ (.Values.studio.config).supabaseUrl | default (printf "http://%s.%s:%d" .Values.kongOperator.serviceName .Values.kongOperator.serviceNamespace (.Values.kongOperator.servicePort | int)) }}
+  SUPABASE_REST_URL: {{ (.Values.studio.config).supabaseRestUrl | default (printf "http://%s-rest:3000" (include "supabase.fullname" .)) }}
+  SUPABASE_ANON_KEY: {{ .Values.global.anonKey | default "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0" }}
+  SUPABASE_SERVICE_KEY: {{ .Values.global.serviceRoleKey | default "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU" }}
+
+  # Database Configuration
+  POSTGRES_HOST: {{ (.Values.studio.config).postgresHost | default (printf "%s-postgresql" (include "supabase.fullname" .)) }}
+  POSTGRES_PORT: "{{ (.Values.studio.config).postgresPort | default "5432" }}"
+  POSTGRES_DB: {{ (.Values.studio.config).postgresDb | default "postgres" }}
+  POSTGRES_USER: {{ (.Values.studio.config).postgresUser | default "postgres" }}
+
+  # Auth Configuration
+  SUPABASE_AUTH_URL: {{ (.Values.studio.config).authUrl | default (printf "http://%s-auth:9999" (include "supabase.fullname" .)) }}
+  GOTRUE_URL: {{ (.Values.studio.config).gotrueUrl | default (printf "http://%s-auth:9999" (include "supabase.fullname" .)) }}
+
+  # Storage Configuration
+  SUPABASE_STORAGE_URL: {{ (.Values.studio.config).storageUrl | default (printf "http://%s-storage:5000" (include "supabase.fullname" .)) }}
+
+  # Realtime Configuration
+  SUPABASE_REALTIME_URL: {{ (.Values.studio.config).realtimeUrl | default (printf "ws://%s-realtime:4000" (include "supabase.fullname" .)) }}
+
+  # Studio Specific Configuration
+  STUDIO_PORT: "{{ (.Values.studio.config).port | default "3000" }}"
+  STUDIO_HOST: {{ (.Values.studio.config).host | default "0.0.0.0" }}
+  NEXT_PUBLIC_ENABLE_LOGS: "{{ (.Values.studio.config).enableLogs | default "true" }}"
+  NEXT_PUBLIC_GOTRUE_URL: {{ (.Values.studio.config).publicGotrueUrl | default "http://localhost:8000/auth/v1" }}
+  NEXT_PUBLIC_SUPABASE_URL: {{ (.Values.studio.config).publicSupabaseUrl | default "http://localhost:8000" }}
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: {{ .Values.global.anonKey | default "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0" }}
+
+  # Feature Flags
+  NEXT_PUBLIC_IS_PLATFORM: "{{ (.Values.studio.config).isPlatform | default "false" }}"
+  NEXT_PUBLIC_ENVIRONMENT: {{ (.Values.studio.config).environment | default "local" }}
+  LOGFLARE_API_KEY: {{ (.Values.studio.config).logflareApiKey | default "" }}
+  LOGFLARE_URL: {{ (.Values.studio.config).logflareUrl | default "" }}
+
+  # Security
+  NEXTAUTH_URL: {{ (.Values.studio.config).nextAuthUrl | default "http://localhost:3000" }}
+  NEXTAUTH_SECRET: {{ (.Values.studio.config).nextAuthSecret | default "super-secret-nextauth-secret" }}
+
+  # API Configuration
+  DEFAULT_ORGANIZATION_ID: {{ (.Values.studio.config).defaultOrganizationId | default "default" }}
+  DEFAULT_PROJECT_ID: {{ (.Values.studio.config).defaultProjectId | default "default" }}
+
+  {{- end }}
+  {{- if and .Values.studio.configMap .Values.studio.configMap.additionalData }}
+  {{- range $key, $value := .Values.studio.configMap.additionalData }}
+  {{ $key }}: {{ $value | toString | quote }}
+  {{- end }}
+  {{- end }}
+{{- end }}

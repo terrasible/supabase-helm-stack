@@ -1,0 +1,104 @@
+{{- if and .Values.studio.enabled .Values.studio.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "supabase.fullname" . }}-studio
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: studio
+    {{- with .Values.studio.serviceMonitor.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.studio.serviceMonitor.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.studio.serviceMonitor.jobLabel }}
+  jobLabel: {{ .Values.studio.serviceMonitor.jobLabel }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "supabase.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: studio
+      {{- with .Values.studio.serviceMonitor.selector }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+  endpoints:
+    - port: {{ .Values.studio.serviceMonitor.port | default "metrics" }}
+      {{- if .Values.studio.serviceMonitor.interval }}
+      interval: {{ .Values.studio.serviceMonitor.interval }}
+      {{- end }}
+      {{- if .Values.studio.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ .Values.studio.serviceMonitor.scrapeTimeout }}
+      {{- end }}
+      path: {{ .Values.studio.serviceMonitor.path | default "/metrics" }}
+      {{- if .Values.studio.serviceMonitor.scheme }}
+      scheme: {{ .Values.studio.serviceMonitor.scheme }}
+      {{- end }}
+      {{- if .Values.studio.serviceMonitor.tlsConfig }}
+      tlsConfig:
+        {{- toYaml .Values.studio.serviceMonitor.tlsConfig | nindent 8 }}
+      {{- end }}
+      {{- if .Values.studio.serviceMonitor.bearerTokenFile }}
+      bearerTokenFile: {{ .Values.studio.serviceMonitor.bearerTokenFile }}
+      {{- end }}
+      {{- if .Values.studio.serviceMonitor.bearerTokenSecret }}
+      bearerTokenSecret:
+        {{- toYaml .Values.studio.serviceMonitor.bearerTokenSecret | nindent 8 }}
+      {{- end }}
+      {{- if .Values.studio.serviceMonitor.basicAuth }}
+      basicAuth:
+        {{- toYaml .Values.studio.serviceMonitor.basicAuth | nindent 8 }}
+      {{- end }}
+      {{- if .Values.studio.serviceMonitor.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml .Values.studio.serviceMonitor.metricRelabelings | nindent 8 }}
+      {{- end }}
+      {{- if .Values.studio.serviceMonitor.relabelings }}
+      relabelings:
+        {{- toYaml .Values.studio.serviceMonitor.relabelings | nindent 8 }}
+      {{- end }}
+      {{- if .Values.studio.serviceMonitor.proxyUrl }}
+      proxyUrl: {{ .Values.studio.serviceMonitor.proxyUrl }}
+      {{- end }}
+      {{- if .Values.studio.serviceMonitor.honorLabels }}
+      honorLabels: {{ .Values.studio.serviceMonitor.honorLabels }}
+      {{- end }}
+      {{- if .Values.studio.serviceMonitor.honorTimestamps }}
+      honorTimestamps: {{ .Values.studio.serviceMonitor.honorTimestamps }}
+      {{- end }}
+      {{- if .Values.studio.serviceMonitor.followRedirects }}
+      followRedirects: {{ .Values.studio.serviceMonitor.followRedirects }}
+      {{- end }}
+      {{- if .Values.studio.serviceMonitor.enableHttp2 }}
+      enableHttp2: {{ .Values.studio.serviceMonitor.enableHttp2 }}
+      {{- end }}
+  {{- if .Values.studio.serviceMonitor.targetLabels }}
+  targetLabels:
+    {{- toYaml .Values.studio.serviceMonitor.targetLabels | nindent 4 }}
+  {{- end }}
+  {{- if .Values.studio.serviceMonitor.podTargetLabels }}
+  podTargetLabels:
+    {{- toYaml .Values.studio.serviceMonitor.podTargetLabels | nindent 4 }}
+  {{- end }}
+  {{- if .Values.studio.serviceMonitor.sampleLimit }}
+  sampleLimit: {{ .Values.studio.serviceMonitor.sampleLimit }}
+  {{- end }}
+  {{- if .Values.studio.serviceMonitor.targetLimit }}
+  targetLimit: {{ .Values.studio.serviceMonitor.targetLimit }}
+  {{- end }}
+  {{- if .Values.studio.serviceMonitor.labelLimit }}
+  labelLimit: {{ .Values.studio.serviceMonitor.labelLimit }}
+  {{- end }}
+  {{- if .Values.studio.serviceMonitor.labelNameLengthLimit }}
+  labelNameLengthLimit: {{ .Values.studio.serviceMonitor.labelNameLengthLimit }}
+  {{- end }}
+  {{- if .Values.studio.serviceMonitor.labelValueLengthLimit }}
+  labelValueLengthLimit: {{ .Values.studio.serviceMonitor.labelValueLengthLimit }}
+  {{- end }}
+  {{- if .Values.studio.serviceMonitor.namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml .Values.studio.serviceMonitor.namespaceSelector | nindent 4 }}
+  {{- end }}
+{{- end }}

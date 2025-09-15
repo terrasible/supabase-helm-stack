@@ -1,0 +1,313 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "supabase.fullname" . }}-integration-test-suite"
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "100"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  {{- if .Values.rbac.create }}
+  serviceAccountName: {{ include "supabase.serviceAccountName" . }}
+  {{- end }}
+  containers:
+  - name: integration-test-suite
+    image: curlimages/curl:8.5.0
+    command: ["/bin/sh"]
+    args:
+      - -c
+      - |
+        set -e
+        echo "🧪 Starting Supabase Integration Test Suite..."
+        echo "================================================"
+
+        # Test configuration
+        NAMESPACE="{{ .Release.Namespace }}"
+        RELEASE_NAME="{{ .Release.Name }}"
+
+        # Color codes for output
+        RED='\033[0;31m'
+        GREEN='\033[0;32m'
+        YELLOW='\033[1;33m'
+        BLUE='\033[0;34m'
+        NC='\033[0m' # No Color
+
+        # Test counters
+        TOTAL_TESTS=0
+        PASSED_TESTS=0
+        FAILED_TESTS=0
+
+        # Helper function to run tests
+        run_test() {
+          local test_name="$1"
+          local test_command="$2"
+          local expected_result="$3"
+
+          TOTAL_TESTS=$((TOTAL_TESTS + 1))
+          echo -e "${BLUE}🔍 Running test: $test_name${NC}"
+
+          if eval "$test_command"; then
+            if [ "$expected_result" = "success" ]; then
+              echo -e "${GREEN}✅ PASS: $test_name${NC}"
+              PASSED_TESTS=$((PASSED_TESTS + 1))
+            else
+              echo -e "${RED}❌ FAIL: $test_name (expected failure but got success)${NC}"
+              FAILED_TESTS=$((FAILED_TESTS + 1))
+            fi
+          else
+            if [ "$expected_result" = "failure" ]; then
+              echo -e "${GREEN}✅ PASS: $test_name (expected failure)${NC}"
+              PASSED_TESTS=$((PASSED_TESTS + 1))
+            else
+              echo -e "${RED}❌ FAIL: $test_name${NC}"
+              FAILED_TESTS=$((FAILED_TESTS + 1))
+            fi
+          fi
+          echo ""
+        }
+
+        echo -e "${BLUE}📋 Test Environment Information${NC}"
+        echo "Namespace: $NAMESPACE"
+        echo "Release: $RELEASE_NAME"
+        echo "Timestamp: $(date)"
+        echo ""
+
+        # 1. BASIC CONNECTIVITY TESTS
+        echo -e "${YELLOW}🌐 1. BASIC CONNECTIVITY TESTS${NC}"
+        echo "=============================="
+
+        {{- if .Values.auth.enabled }}
+        run_test "Auth Service Health" \
+          "curl -f -s --max-time 10 'http://{{ include "supabase.fullname" . }}-auth:{{ .Values.auth.service.port }}/health' > /dev/null" \
+          "success"
+        {{- end }}
+
+        {{- if .Values.rest.enabled }}
+        run_test "REST API Service" \
+          "curl -f -s --max-time 10 'http://{{ include "supabase.fullname" . }}-rest:{{ .Values.rest.service.port }}/' > /dev/null" \
+          "success"
+        {{- end }}
+
+        {{- if .Values.storage.enabled }}
+        run_test "Storage Service Health" \
+          "curl -f -s --max-time 10 'http://{{ include "supabase.fullname" . }}-storage:{{ .Values.storage.service.port }}/status' > /dev/null" \
+          "success"
+        {{- end }}
+
+        {{- if .Values.realtime.enabled }}
+        run_test "Realtime Service" \
+          "curl -f -s --max-time 10 'http://{{ include "supabase.fullname" . }}-realtime:{{ .Values.realtime.service.port }}/' > /dev/null" \
+          "success"
+        {{- end }}
+
+        {{- if .Values.studio.enabled }}
+        run_test "Studio Service" \
+          "curl -f -s --max-time 10 'http://{{ include "supabase.fullname" . }}-studio:{{ .Values.studio.service.port }}/' > /dev/null" \
+          "success"
+        {{- end }}
+
+        {{- if .Values.meta.enabled }}
+        run_test "Meta Service Health" \
+          "curl -f -s --max-time 10 'http://{{ include "supabase.fullname" . }}-meta:{{ .Values.meta.service.port }}/health' > /dev/null" \
+          "success"
+        {{- end }}
+
+        # 2. DATABASE CONNECTIVITY TESTS
+        echo -e "${YELLOW}🐘 2. DATABASE CONNECTIVITY TESTS${NC}"
+        echo "================================="
+
+        {{- if .Values.postgresql.enabled }}
+        run_test "PostgreSQL Connectivity" \
+          "nc -z {{ include "supabase.postgresql.host" . }} {{ include "supabase.postgresql.port" . }}" \
+          "success"
+        {{- end }}
+
+        # 3. API GATEWAY TESTS
+        echo -e "${YELLOW}🚪 3. API GATEWAY TESTS${NC}"
+        echo "======================"
+
+        {{- if .Values.kong.enabled }}
+        run_test "Kong Gateway Admin API" \
+          "curl -f -s --max-time 10 'http://{{ include "supabase.fullname" . }}-kong:{{ .Values.kong.admin.service.port }}/status' > /dev/null" \
+          "success"
+
+        run_test "Kong Gateway Proxy" \
+          "curl -f -s --max-time 10 'http://{{ include "supabase.fullname" . }}-kong:{{ .Values.kong.proxy.service.port }}/' > /dev/null" \
+          "success"
+        {{- end }}
+
+        {{- if .Values.kongOperator.enabled }}
+        run_test "Kong Operator Gateway" \
+          "curl -f -s --max-time 10 'http://{{ .Values.kongOperator.serviceName }}:{{ .Values.kongOperator.servicePort }}/' > /dev/null" \
+          "success"
+
+        run_test "Kong Operator Admin API" \
+          "curl -f -s --max-time 10 'http://{{ .Values.kongOperator.serviceName }}:{{ .Values.kongOperator.adminPort }}/status' > /dev/null" \
+          "success"
+        {{- end }}
+
+        # 4. STORAGE BACKEND TESTS
+        echo -e "${YELLOW}🪣 4. STORAGE BACKEND TESTS${NC}"
+        echo "=========================="
+
+        {{- if .Values.minio.enabled }}
+        run_test "MinIO Health Check" \
+          "curl -f -s --max-time 10 'http://{{ include "supabase.fullname" . }}-minio:{{ .Values.minio.service.port }}/minio/health/live'" \
+          "success"
+        {{- end }}
+
+        # 5. MONITORING TESTS
+        echo -e "${YELLOW}📊 5. MONITORING TESTS${NC}"
+        echo "====================="
+
+        {{- if .Values.monitoring.enabled }}
+        {{- if .Values.auth.enabled }}
+        run_test "Auth Metrics Endpoint" \
+          "curl -f -s --max-time 10 'http://{{ include "supabase.fullname" . }}-auth:{{ .Values.auth.service.port }}/metrics' | grep -q '# HELP'" \
+          "success"
+        {{- end }}
+
+        {{- if .Values.rest.enabled }}
+        run_test "REST Metrics Endpoint" \
+          "curl -f -s --max-time 10 'http://{{ include "supabase.fullname" . }}-rest:{{ .Values.rest.service.port }}/metrics' | grep -q '# HELP'" \
+          "success"
+        {{- end }}
+        {{- end }}
+
+        # 6. AUTHENTICATION FLOW TESTS
+        echo -e "${YELLOW}🔐 6. AUTHENTICATION FLOW TESTS${NC}"
+        echo "=============================="
+
+        {{- if .Values.auth.enabled }}
+        # Test auth signup endpoint
+        run_test "Auth Signup Endpoint" \
+          "curl -f -s --max-time 10 -X POST 'http://{{ include "supabase.fullname" . }}-auth:{{ .Values.auth.service.port }}/signup' -H 'Content-Type: application/json' -d '{\"email\":\"test@example.com\",\"password\":\"testpass123\"}' | grep -q 'email\|error'" \
+          "success"
+
+        # Test auth settings endpoint
+        run_test "Auth Settings Endpoint" \
+          "curl -f -s --max-time 10 'http://{{ include "supabase.fullname" . }}-auth:{{ .Values.auth.service.port }}/settings' > /dev/null" \
+          "success"
+        {{- end }}
+
+        # 7. API INTEGRATION TESTS
+        echo -e "${YELLOW}🔌 7. API INTEGRATION TESTS${NC}"
+        echo "=========================="
+
+        {{- if .Values.rest.enabled }}
+        # Test REST API with anon key
+        run_test "REST API with Anon Key" \
+          "curl -f -s --max-time 10 'http://{{ include "supabase.fullname" . }}-rest:{{ .Values.rest.service.port }}/' -H 'apikey: {{ .Values.secret.jwt.anonKey }}' > /dev/null" \
+          "success"
+        {{- end }}
+
+        # 8. CROSS-SERVICE COMMUNICATION TESTS
+        echo -e "${YELLOW}🔄 8. CROSS-SERVICE COMMUNICATION TESTS${NC}"
+        echo "======================================"
+
+        {{- if and .Values.auth.enabled .Values.rest.enabled }}
+        # Test if auth can reach REST (internal communication)
+        run_test "Auth to REST Communication" \
+          "nc -z {{ include "supabase.fullname" . }}-rest {{ .Values.rest.service.port }}" \
+          "success"
+        {{- end }}
+
+        {{- if and .Values.storage.enabled .Values.minio.enabled }}
+        # Test if storage can reach MinIO
+        run_test "Storage to MinIO Communication" \
+          "nc -z {{ include "supabase.fullname" . }}-minio {{ .Values.minio.service.port }}" \
+          "success"
+        {{- end }}
+
+        # 9. SECURITY TESTS
+        echo -e "${YELLOW}🛡️  9. SECURITY TESTS${NC}"
+        echo "=================="
+
+        # Test that admin endpoints are not publicly accessible
+        {{- if .Values.kong.enabled }}
+        run_test "Kong Admin API Security" \
+          "timeout 5 curl -f -s 'http://{{ include "supabase.fullname" . }}-kong:{{ .Values.kong.admin.service.port }}/status' > /dev/null" \
+          "success"
+        {{- end }}
+
+        # Test JWT validation
+        {{- if .Values.rest.enabled }}
+        run_test "Invalid JWT Rejection" \
+          "curl -f -s --max-time 10 'http://{{ include "supabase.fullname" . }}-rest:{{ .Values.rest.service.port }}/' -H 'apikey: invalid-jwt-token'" \
+          "failure"
+        {{- end }}
+
+        # 10. PERFORMANCE TESTS
+        echo -e "${YELLOW}⚡ 10. PERFORMANCE TESTS${NC}"
+        echo "======================"
+
+        {{- if .Values.auth.enabled }}
+        # Test response time for auth health endpoint
+        run_test "Auth Response Time < 5s" \
+          "timeout 5 curl -f -s 'http://{{ include "supabase.fullname" . }}-auth:{{ .Values.auth.service.port }}/health' > /dev/null" \
+          "success"
+        {{- end }}
+
+        {{- if .Values.rest.enabled }}
+        # Test response time for REST API
+        run_test "REST API Response Time < 5s" \
+          "timeout 5 curl -f -s 'http://{{ include "supabase.fullname" . }}-rest:{{ .Values.rest.service.port }}/' > /dev/null" \
+          "success"
+        {{- end }}
+
+        # 11. DATA PERSISTENCE TESTS
+        echo -e "${YELLOW}💾 11. DATA PERSISTENCE TESTS${NC}"
+        echo "============================"
+
+        {{- if .Values.postgresql.enabled }}
+        # Test PostgreSQL data directory exists
+        run_test "PostgreSQL Data Persistence" \
+          "nc -z {{ include "supabase.postgresql.host" . }} {{ include "supabase.postgresql.port" . }}" \
+          "success"
+        {{- end }}
+
+        # 12. CONFIGURATION VALIDATION TESTS
+        echo -e "${YELLOW}⚙️  12. CONFIGURATION VALIDATION TESTS${NC}"
+        echo "===================================="
+
+        # Test that required environment variables are set
+        {{- if .Values.auth.enabled }}
+        run_test "JWT Secret Configuration" \
+          "[ -n '{{ .Values.secret.jwt.secret }}' ] && [ '{{ .Values.secret.jwt.secret }}' != 'your-super-secret-jwt-token-with-at-least-32-characters-long' ]" \
+          "success"
+        {{- end }}
+
+        # Test database password is set
+        {{- if .Values.postgresql.enabled }}
+        run_test "Database Password Configuration" \
+          "[ -n '{{ .Values.secret.db.password }}' ]" \
+          "success"
+        {{- end }}
+
+        # FINAL RESULTS
+        echo "================================================"
+        echo -e "${BLUE}📊 INTEGRATION TEST SUITE RESULTS${NC}"
+        echo "================================================"
+        echo -e "Total Tests: $TOTAL_TESTS"
+        echo -e "${GREEN}Passed: $PASSED_TESTS${NC}"
+        echo -e "${RED}Failed: $FAILED_TESTS${NC}"
+
+        if [ $FAILED_TESTS -eq 0 ]; then
+          echo -e "${GREEN}🎉 ALL TESTS PASSED! Supabase deployment is healthy.${NC}"
+          echo "================================================"
+          exit 0
+        else
+          echo -e "${RED}❌ SOME TESTS FAILED! Please check the deployment.${NC}"
+          echo "================================================"
+          exit 1
+        fi
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi

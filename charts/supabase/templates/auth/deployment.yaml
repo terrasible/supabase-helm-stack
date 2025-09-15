@@ -1,0 +1,159 @@
+{{- if .Values.auth.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "supabase.auth.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.auth.autoscaling.enabled }}
+  replicas: {{ .Values.auth.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "supabase.auth.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.auth.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "supabase.auth.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.auth.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "supabase.auth.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.auth.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: init-db
+          image: postgres:15-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DB_HOST
+              {{- if .Values.db.enabled }}
+              value: {{ include "supabase.db.fullname" . | quote }}
+              {{- else }}
+              value: {{ .Values.auth.environment.DB_HOST | quote }}
+              {{- end }}
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "supabase.secret.auth-db" . }}
+                  key: username
+            - name: DB_PORT
+              value: "{{ .Values.auth.environment.DB_PORT }}"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER"; do
+              echo "Waiting for database to start..."
+              sleep 2
+              done
+            - echo "Database is ready"
+      containers:
+        - name: {{ include "supabase.auth.name" $ }}
+          securityContext:
+            {{- toYaml .Values.auth.securityContext | nindent 12 }}
+          image: "{{ .Values.auth.image.repository }}:{{ .Values.auth.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.auth.image.pullPolicy }}
+          env:
+            {{- range $key, $value := .Values.auth.environment }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- if .Values.db.enabled }}
+            - name: DB_HOST
+              value: {{ include "supabase.db.fullname" . }}
+            {{- end }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "supabase.secret.auth-db" . }}
+                  key: password
+            - name: DB_PASSWORD_ENC
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "supabase.secret.auth-db" . }}
+                  key: password_encoded
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "supabase.secret.auth-db" . }}
+                  key: database
+            - name: GOTRUE_DB_DATABASE_URL
+              value: $(DB_DRIVER)://$(DB_USER):$(DB_PASSWORD_ENC)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?search_path=auth&sslmode=$(DB_SSL)
+            - name: GOTRUE_DB_DRIVER
+              value: $(DB_DRIVER)
+            - name: GOTRUE_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "jwt" "field" "secret" "context" .) | nindent 18 }}
+            - name: GOTRUE_SMTP_USER
+              valueFrom:
+                secretKeyRef:
+                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "smtp" "field" "username" "context" .) | nindent 18 }}
+            - name: GOTRUE_SMTP_PASS
+              valueFrom:
+                secretKeyRef:
+                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "smtp" "field" "password" "context" .) | nindent 18 }}
+            - name: GOTRUE_SMTP_HOST
+              valueFrom:
+                secretKeyRef:
+                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "smtp" "field" "host" "context" .) | nindent 18 }}
+            - name: GOTRUE_SMTP_PORT
+              valueFrom:
+                secretKeyRef:
+                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "smtp" "field" "port" "context" .) | nindent 18 }}
+            - name: GOTRUE_SMTP_ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "smtp" "field" "admin_email" "context" .) | nindent 18 }}
+            - name: GOTRUE_SMTP_SENDER_NAME
+              valueFrom:
+                secretKeyRef:
+                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "smtp" "field" "sender_name" "context" .) | nindent 18 }}
+          {{- with .Values.auth.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.auth.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.auth.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 9999
+              protocol: TCP
+          {{- with .Values.auth.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.auth.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.auth.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.auth.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.auth.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.auth.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

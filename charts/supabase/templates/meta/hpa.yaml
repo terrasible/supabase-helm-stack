@@ -1,0 +1,144 @@
+{{- if and .Values.meta.enabled .Values.meta.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "supabase.fullname" . }}-meta
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: meta
+  {{- with .Values.meta.autoscaling.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "supabase.fullname" . }}-meta
+  minReplicas: {{ .Values.meta.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.meta.autoscaling.maxReplicas }}
+  metrics:
+    {{- if .Values.meta.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.meta.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.meta.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.meta.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.meta.autoscaling.customMetrics }}
+    {{- range .Values.meta.autoscaling.customMetrics }}
+    - type: {{ .type }}
+      {{- if eq .type "Pods" }}
+      pods:
+        metric:
+          name: {{ .metric.name }}
+          {{- if .metric.selector }}
+          selector:
+            {{- toYaml .metric.selector | nindent 12 }}
+          {{- end }}
+        target:
+          type: {{ .target.type }}
+          {{- if .target.averageValue }}
+          averageValue: {{ .target.averageValue }}
+          {{- end }}
+          {{- if .target.value }}
+          value: {{ .target.value }}
+          {{- end }}
+      {{- else if eq .type "Object" }}
+      object:
+        metric:
+          name: {{ .metric.name }}
+          {{- if .metric.selector }}
+          selector:
+            {{- toYaml .metric.selector | nindent 12 }}
+          {{- end }}
+        describedObject:
+          apiVersion: {{ .describedObject.apiVersion }}
+          kind: {{ .describedObject.kind }}
+          name: {{ .describedObject.name }}
+        target:
+          type: {{ .target.type }}
+          {{- if .target.averageValue }}
+          averageValue: {{ .target.averageValue }}
+          {{- end }}
+          {{- if .target.value }}
+          value: {{ .target.value }}
+          {{- end }}
+      {{- else if eq .type "External" }}
+      external:
+        metric:
+          name: {{ .metric.name }}
+          {{- if .metric.selector }}
+          selector:
+            {{- toYaml .metric.selector | nindent 12 }}
+          {{- end }}
+        target:
+          type: {{ .target.type }}
+          {{- if .target.averageValue }}
+          averageValue: {{ .target.averageValue }}
+          {{- end }}
+          {{- if .target.value }}
+          value: {{ .target.value }}
+          {{- end }}
+      {{- else if eq .type "ContainerResource" }}
+      containerResource:
+        name: {{ .containerResource.name }}
+        container: {{ .containerResource.container }}
+        target:
+          type: {{ .target.type }}
+          {{- if .target.averageUtilization }}
+          averageUtilization: {{ .target.averageUtilization }}
+          {{- end }}
+          {{- if .target.averageValue }}
+          averageValue: {{ .target.averageValue }}
+          {{- end }}
+      {{- end }}
+    {{- end }}
+    {{- end }}
+  {{- if .Values.meta.autoscaling.behavior }}
+  behavior:
+    {{- if .Values.meta.autoscaling.behavior.scaleDown }}
+    scaleDown:
+      {{- if .Values.meta.autoscaling.behavior.scaleDown.stabilizationWindowSeconds }}
+      stabilizationWindowSeconds: {{ .Values.meta.autoscaling.behavior.scaleDown.stabilizationWindowSeconds }}
+      {{- end }}
+      {{- if .Values.meta.autoscaling.behavior.scaleDown.selectPolicy }}
+      selectPolicy: {{ .Values.meta.autoscaling.behavior.scaleDown.selectPolicy }}
+      {{- end }}
+      {{- if .Values.meta.autoscaling.behavior.scaleDown.policies }}
+      policies:
+        {{- range .Values.meta.autoscaling.behavior.scaleDown.policies }}
+        - type: {{ .type }}
+          value: {{ .value }}
+          periodSeconds: {{ .periodSeconds }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.meta.autoscaling.behavior.scaleUp }}
+    scaleUp:
+      {{- if .Values.meta.autoscaling.behavior.scaleUp.stabilizationWindowSeconds }}
+      stabilizationWindowSeconds: {{ .Values.meta.autoscaling.behavior.scaleUp.stabilizationWindowSeconds }}
+      {{- end }}
+      {{- if .Values.meta.autoscaling.behavior.scaleUp.selectPolicy }}
+      selectPolicy: {{ .Values.meta.autoscaling.behavior.scaleUp.selectPolicy }}
+      {{- end }}
+      {{- if .Values.meta.autoscaling.behavior.scaleUp.policies }}
+      policies:
+        {{- range .Values.meta.autoscaling.behavior.scaleUp.policies }}
+        - type: {{ .type }}
+          value: {{ .value }}
+          periodSeconds: {{ .periodSeconds }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}

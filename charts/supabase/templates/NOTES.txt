@@ -1,0 +1,69 @@
+---
+Thank you for installing {{ .Chart.Name }}!
+
+🚀 Supabase Helm Stack Installation Complete!
+
+📋 DEPENDENCY CHARTS STATUS:
+{{- if .Values.postgresql.enabled }}
+✅ PostgreSQL: Enabled (Bitnami Chart)
+{{- else }}
+❌ PostgreSQL: Disabled (External database required)
+{{- end }}
+{{- if .Values.kongOperator.enabled }}
+✅ Kong Gateway: Enabled (Kong Operator)
+{{- else }}
+❌ Kong Gateway: Disabled (Kong Operator not configured)
+{{- end }}
+{{- if .Values.minio.enabled }}
+✅ MinIO: Enabled (Bitnami Chart)
+{{- else }}
+❌ MinIO: Disabled (External S3 storage required)
+{{- end }}
+{{- if .Values.vector.enabled }}
+✅ Vector: Enabled (Vector Chart)
+{{- else }}
+❌ Vector: Disabled
+{{- end }}
+
+🔧 POST-INSTALLATION STEPS:
+
+1. Wait for all pods to be ready:
+   kubectl get pods -n {{ .Release.Namespace }} -w
+
+2. Check dependency chart status:
+   helm list -n {{ .Release.Namespace }}
+
+{{- if .Values.postgresql.enabled }}
+3. Get PostgreSQL credentials:
+   export POSTGRES_PASSWORD=$(kubectl get secret --namespace {{ .Release.Namespace }} {{ .Release.Name }}-postgresql -o jsonpath="{.data.postgres-password}" | base64 -d)
+   echo "PostgreSQL Password: $POSTGRES_PASSWORD"
+{{- end }}
+
+4. Port-forward to access Studio locally:
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "supabase.studio.fullname" . }} 3000:3000
+   Studio URL: http://localhost:3000
+
+5. Access API Gateway:
+   {{- if .Values.kongOperator.enabled }}
+   kubectl port-forward -n {{ .Values.kongOperator.serviceNamespace }} svc/{{ .Values.kongOperator.serviceName }} 8000:{{ .Values.kongOperator.servicePort }}
+   {{- else }}
+   # Kong Operator not enabled - configure Kong Gateway separately
+   {{- end }}
+   API URL: http://localhost:8000/rest/v1
+
+🔐 SECURITY NOTES:
+- Change default JWT secrets in production
+- Configure proper RBAC and network policies
+- Enable TLS/SSL for external access
+- Review and update resource limits
+
+📚 DOCUMENTATION:
+- Supabase Docs: https://supabase.com/docs
+- Chart Repository: https://github.com/supabase-community/supabase-helm
+
+🐛 TROUBLESHOOTING:
+- Check logs: kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+- Verify secrets: kubectl get secrets -n {{ .Release.Namespace }}
+- Check services: kubectl get svc -n {{ .Release.Namespace }}
+
+For support, visit: https://github.com/supabase-community/supabase-helm/issues

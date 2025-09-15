@@ -1,0 +1,100 @@
+{{- if and .Values.realtime.enabled .Values.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "supabase.fullname" . }}-realtime
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: realtime
+    {{- with .Values.prometheusRule.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.prometheusRule.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  groups:
+    - name: supabase.realtime
+      rules:
+        # Realtime service availability
+        - alert: SupabaseRealtimeDown
+          expr: up{job="supabase-realtime"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            service: realtime
+          annotations:
+            summary: "Supabase Realtime service is down"
+            description: "Supabase Realtime service has been down for more than 5 minutes."
+
+        # High WebSocket connection count
+        - alert: SupabaseRealtimeHighConnections
+          expr: realtime_websocket_connections > {{ .Values.prometheusRule.realtime.maxConnections | default 1000 }}
+          for: 10m
+          labels:
+            severity: warning
+            service: realtime
+          annotations:
+            summary: "High WebSocket connection count in Supabase Realtime"
+            description: "Realtime service has {{ "{{ $value }}" }} WebSocket connections, which is above the threshold of {{ .Values.prometheusRule.realtime.maxConnections | default 1000 }}."
+
+        # High message processing latency
+        - alert: SupabaseRealtimeHighLatency
+          expr: histogram_quantile(0.95, rate(realtime_message_processing_duration_seconds_bucket[5m])) > {{ .Values.prometheusRule.realtime.maxLatency | default 1 }}
+          for: 10m
+          labels:
+            severity: warning
+            service: realtime
+          annotations:
+            summary: "High message processing latency in Supabase Realtime"
+            description: "95th percentile latency is {{ "{{ $value }}" }}s, which is above the threshold of {{ .Values.prometheusRule.realtime.maxLatency | default 1 }}s."
+
+        # Database connection issues
+        - alert: SupabaseRealtimeDatabaseConnectionError
+          expr: increase(realtime_database_connection_errors_total[5m]) > {{ .Values.prometheusRule.realtime.maxDbErrors | default 10 }}
+          for: 5m
+          labels:
+            severity: critical
+            service: realtime
+          annotations:
+            summary: "Database connection errors in Supabase Realtime"
+            description: "Realtime service has experienced {{ "{{ $value }}" }} database connection errors in the last 5 minutes."
+
+        # High memory usage
+        - alert: SupabaseRealtimeHighMemoryUsage
+          expr: (container_memory_working_set_bytes{pod=~".*realtime.*"} / container_spec_memory_limit_bytes{pod=~".*realtime.*"}) * 100 > {{ .Values.prometheusRule.realtime.maxMemoryUsage | default 80 }}
+          for: 15m
+          labels:
+            severity: warning
+            service: realtime
+          annotations:
+            summary: "High memory usage in Supabase Realtime"
+            description: "Realtime service memory usage is {{ "{{ $value }}" }}%, which is above the threshold of {{ .Values.prometheusRule.realtime.maxMemoryUsage | default 80 }}%."
+
+        # High CPU usage
+        - alert: SupabaseRealtimeHighCPUUsage
+          expr: (rate(container_cpu_usage_seconds_total{pod=~".*realtime.*"}[5m]) * 100) > {{ .Values.prometheusRule.realtime.maxCpuUsage | default 80 }}
+          for: 15m
+          labels:
+            severity: warning
+            service: realtime
+          annotations:
+            summary: "High CPU usage in Supabase Realtime"
+            description: "Realtime service CPU usage is {{ "{{ $value }}" }}%, which is above the threshold of {{ .Values.prometheusRule.realtime.maxCpuUsage | default 80 }}%."
+
+        # Channel subscription errors
+        - alert: SupabaseRealtimeChannelErrors
+          expr: increase(realtime_channel_subscription_errors_total[5m]) > {{ .Values.prometheusRule.realtime.maxChannelErrors | default 5 }}
+          for: 5m
+          labels:
+            severity: warning
+            service: realtime
+          annotations:
+            summary: "Channel subscription errors in Supabase Realtime"
+            description: "Realtime service has experienced {{ "{{ $value }}" }} channel subscription errors in the last 5 minutes."
+
+        {{- if .Values.prometheusRule.realtime.additionalRules }}
+        {{- toYaml .Values.prometheusRule.realtime.additionalRules | nindent 8 }}
+        {{- end }}
+{{- end }}

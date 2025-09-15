@@ -1,0 +1,152 @@
+{{- if and .Values.meta.enabled .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "supabase.fullname" . }}-meta
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: meta
+  {{- with .Values.networkPolicy.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "supabase.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: meta
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from Kong Gateway (via Kong Operator)
+    {{- if .Values.kongOperator.enabled }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: {{ .Values.kongOperator.serviceNamespace }}
+        - podSelector:
+            matchLabels:
+              app: kong
+    {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.meta.service.port }}
+
+    # Allow traffic from Auth service
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "supabase.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: auth
+      ports:
+        - protocol: TCP
+          port: {{ .Values.meta.service.port }}
+
+    # Allow traffic from API service
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "supabase.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: api
+      ports:
+        - protocol: TCP
+          port: {{ .Values.meta.service.port }}
+
+    # Allow traffic from Studio
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "supabase.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: studio
+      ports:
+        - protocol: TCP
+          port: {{ .Values.meta.service.port }}
+
+    # Allow Prometheus scraping
+    {{- if .Values.meta.metrics.enabled }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: {{ .Values.networkPolicy.prometheusNamespace | default "monitoring" }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: {{ .Values.meta.metrics.port }}
+    {{- end }}
+
+    # Allow traffic from ingress controllers
+    {{- if .Values.networkPolicy.ingress.enabled }}
+    - from:
+        {{- if .Values.networkPolicy.ingress.namespaceSelector }}
+        - namespaceSelector:
+            {{- toYaml .Values.networkPolicy.ingress.namespaceSelector | nindent 12 }}
+        {{- end }}
+        {{- if .Values.networkPolicy.ingress.podSelector }}
+        - podSelector:
+            {{- toYaml .Values.networkPolicy.ingress.podSelector | nindent 12 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.meta.service.port }}
+    {{- end }}
+
+    # Additional ingress rules
+    {{- if .Values.meta.networkPolicy.additionalIngressRules }}
+    {{- range .Values.meta.networkPolicy.additionalIngressRules }}
+    - {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- end }}
+
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow access to PostgreSQL database
+    - to:
+        {{- if .Values.meta.database.networkPolicy.podSelector }}
+        - podSelector:
+            {{- toYaml .Values.meta.database.networkPolicy.podSelector | nindent 12 }}
+        {{- end }}
+        {{- if .Values.meta.database.networkPolicy.namespaceSelector }}
+        - namespaceSelector:
+            {{- toYaml .Values.meta.database.networkPolicy.namespaceSelector | nindent 12 }}
+        {{- end }}
+        {{- if .Values.meta.database.networkPolicy.ipBlock }}
+        - ipBlock:
+            {{- toYaml .Values.meta.database.networkPolicy.ipBlock | nindent 12 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.meta.database.port }}
+
+    # Allow HTTPS for external services (if needed)
+    {{- if .Values.meta.networkPolicy.allowExternalHttps }}
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
+
+    # Allow HTTP for external services (if needed)
+    {{- if .Values.meta.networkPolicy.allowExternalHttp }}
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 80
+    {{- end }}
+
+    # Additional egress rules
+    {{- if .Values.meta.networkPolicy.additionalEgressRules }}
+    {{- range .Values.meta.networkPolicy.additionalEgressRules }}
+    - {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- end }}
+{{- end }}

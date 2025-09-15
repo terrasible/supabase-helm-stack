@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "supabase.fullname" . }}-minio-test"
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "3"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: minio-test
+      image: minio/mc:latest
+      command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Testing MinIO Object Storage..."
+
+          # Configure mc client
+          mc alias set testminio http://{{ .Release.Name }}-minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"
+
+          # Test MinIO connectivity
+          mc admin info testminio
+          if [ $? -eq 0 ]; then
+            echo "✅ MinIO is accessible and responding"
+          else
+            echo "❌ MinIO is not accessible"
+            exit 1
+          fi
+
+          # Test bucket operations
+          mc mb testminio/test-bucket --ignore-existing
+          if [ $? -eq 0 ]; then
+            echo "✅ MinIO bucket operations working"
+          else
+            echo "❌ MinIO bucket operations failed"
+            exit 1
+          fi
+      env:
+        - name: MINIO_ROOT_USER
+      valueFrom:
+        secretKeyRef:
+          name: {{ .Release.Name }}-minio
+          key: root-user
+    - name: MINIO_ROOT_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: {{ .Release.Name }}-minio
+          key: root-password

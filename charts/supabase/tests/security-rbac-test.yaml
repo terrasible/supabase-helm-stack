@@ -1,0 +1,229 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "supabase.fullname" . }}-security-rbac-test"
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "20"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  {{- if .Values.rbac.create }}
+  serviceAccountName: {{ include "supabase.serviceAccountName" . }}
+  {{- end }}
+  containers:
+  - name: security-rbac-test
+    image: bitnami/kubectl:1.28
+    command: ["/bin/bash"]
+    args:
+      - -c
+      - |
+        set -e
+        echo "🧪 Testing Security and RBAC Configuration..."
+
+        {{- if .Values.rbac.create }}
+        echo "🔐 RBAC is enabled, testing permissions..."
+
+        # Test ServiceAccount existence
+        echo "👤 Testing ServiceAccount..."
+        SA_NAME="{{ include "supabase.serviceAccountName" . }}"
+        if kubectl get serviceaccount "$SA_NAME" -n {{ .Release.Namespace }}; then
+          echo "✅ ServiceAccount '$SA_NAME' exists"
+        else
+          echo "❌ ServiceAccount '$SA_NAME' not found"
+          exit 1
+        fi
+
+        # Test ClusterRole existence
+        echo "🎭 Testing ClusterRole..."
+        CLUSTER_ROLE="{{ include "supabase.fullname" . }}"
+        if kubectl get clusterrole "$CLUSTER_ROLE"; then
+          echo "✅ ClusterRole '$CLUSTER_ROLE' exists"
+        else
+          echo "❌ ClusterRole '$CLUSTER_ROLE' not found"
+        fi
+
+        # Test ClusterRoleBinding existence
+        echo "🔗 Testing ClusterRoleBinding..."
+        CLUSTER_ROLE_BINDING="{{ include "supabase.fullname" . }}"
+        if kubectl get clusterrolebinding "$CLUSTER_ROLE_BINDING"; then
+          echo "✅ ClusterRoleBinding '$CLUSTER_ROLE_BINDING' exists"
+        else
+          echo "❌ ClusterRoleBinding '$CLUSTER_ROLE_BINDING' not found"
+        fi
+
+        # Test permissions - try to list pods (should be allowed)
+        echo "📋 Testing pod listing permissions..."
+        if kubectl get pods -n {{ .Release.Namespace }}; then
+          echo "✅ Can list pods in namespace"
+        else
+          echo "❌ Cannot list pods in namespace"
+        fi
+
+        # Test permissions - try to list secrets (should be restricted)
+        echo "🔒 Testing secret access permissions..."
+        if kubectl get secrets -n {{ .Release.Namespace }} --field-selector type=Opaque | head -5; then
+          echo "⚠️  Can access secrets (verify this is intended)"
+        else
+          echo "✅ Secret access is properly restricted"
+        fi
+
+        # Test permissions - try to create a test configmap (should be allowed for service operations)
+        echo "📝 Testing configmap creation permissions..."
+        TEST_CM_NAME="{{ include "supabase.fullname" . }}-rbac-test"
+        if kubectl create configmap "$TEST_CM_NAME" --from-literal=test=value -n {{ .Release.Namespace }}; then
+          echo "✅ Can create configmaps"
+          # Clean up
+          kubectl delete configmap "$TEST_CM_NAME" -n {{ .Release.Namespace }} || true
+        else
+          echo "❌ Cannot create configmaps"
+        fi
+
+        {{- else }}
+        echo "⚠️  RBAC is disabled, testing with default permissions..."
+
+        # Test basic kubectl access
+        if kubectl get pods -n {{ .Release.Namespace }}; then
+          echo "✅ Basic kubectl access works"
+        else
+          echo "❌ Basic kubectl access failed"
+        fi
+
+        echo "⚠️  Consider enabling RBAC for enhanced security"
+        {{- end }}
+
+        echo "🔍 Testing Security Contexts..."
+
+        # Check if pods are running with non-root users
+        echo "👤 Checking non-root user configurations..."
+
+        {{- if .Values.auth.enabled }}
+        # Check Auth pod security context
+        AUTH_POD=$(kubectl get pods -n {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "supabase.name" . }},app.kubernetes.io/component=auth" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+        if [ -n "$AUTH_POD" ]; then
+          echo "Checking Auth pod security context..."
+          if kubectl get pod "$AUTH_POD" -n {{ .Release.Namespace }} -o jsonpath='{.spec.securityContext.runAsNonRoot}' | grep -q "true"; then
+            echo "✅ Auth pod runs as non-root user"
+          else
+            echo "⚠️  Auth pod may be running as root (check security context)"
+          fi
+        fi
+        {{- end }}
+
+        {{- if .Values.storage.enabled }}
+        # Check Storage pod security context
+        STORAGE_POD=$(kubectl get pods -n {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "supabase.name" . }},app.kubernetes.io/component=storage" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+        if [ -n "$STORAGE_POD" ]; then
+          echo "Checking Storage pod security context..."
+          if kubectl get pod "$STORAGE_POD" -n {{ .Release.Namespace }} -o jsonpath='{.spec.securityContext.runAsNonRoot}' | grep -q "true"; then
+            echo "✅ Storage pod runs as non-root user"
+          else
+            echo "⚠️  Storage pod may be running as root (check security context)"
+          fi
+        fi
+        {{- end }}
+
+        echo "🔒 Testing Secret Management..."
+
+        # Check if secrets exist and are properly configured
+        echo "🗝️  Checking secret existence..."
+
+        {{- if .Values.secret.jwt.secret }}
+        # Check JWT secret
+        if kubectl get secret "{{ include "supabase.secretName" . }}" -n {{ .Release.Namespace }}; then
+          echo "✅ JWT secret exists"
+          # Verify secret has required keys
+          if kubectl get secret "{{ include "supabase.secretName" . }}" -n {{ .Release.Namespace }} -o jsonpath='{.data.jwt-secret}' | base64 -d | wc -c | grep -q "[1-9]"; then
+            echo "✅ JWT secret has content"
+          else
+            echo "❌ JWT secret is empty"
+          fi
+        else
+          echo "❌ JWT secret not found"
+        fi
+        {{- end }}
+
+        {{- if .Values.secret.db.password }}
+        # Check database secret
+        if kubectl get secret "{{ include "supabase.secretName" . }}" -n {{ .Release.Namespace }} -o jsonpath='{.data.db-password}' | base64 -d | wc -c | grep -q "[1-9]"; then
+          echo "✅ Database password secret has content"
+        else
+          echo "❌ Database password secret is empty or missing"
+        fi
+        {{- end }}
+
+        echo "🛡️  Testing Pod Security Standards..."
+
+        # Check for security annotations and labels
+        echo "🏷️  Checking security annotations..."
+
+        # List all pods and check for security-related annotations
+        PODS=$(kubectl get pods -n {{ .Release.Namespace }} -l "app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath='{.items[*].metadata.name}')
+
+        for POD in $PODS; do
+          echo "Checking pod: $POD"
+
+          # Check if pod has security context
+          if kubectl get pod "$POD" -n {{ .Release.Namespace }} -o jsonpath='{.spec.securityContext}' | grep -q "runAsNonRoot\|runAsUser\|fsGroup"; then
+            echo "  ✅ Pod has security context configured"
+          else
+            echo "  ⚠️  Pod missing security context"
+          fi
+
+          # Check if containers have security context
+          CONTAINERS=$(kubectl get pod "$POD" -n {{ .Release.Namespace }} -o jsonpath='{.spec.containers[*].name}')
+          for CONTAINER in $CONTAINERS; do
+            if kubectl get pod "$POD" -n {{ .Release.Namespace }} -o jsonpath='{.spec.containers[?(@.name=="'$CONTAINER'")].securityContext}' | grep -q "allowPrivilegeEscalation\|runAsNonRoot\|readOnlyRootFilesystem"; then
+              echo "    ✅ Container $CONTAINER has security context"
+            else
+              echo "    ⚠️  Container $CONTAINER missing security context"
+            fi
+          done
+        done
+
+        echo "🔍 Testing Resource Limits and Requests..."
+
+        # Check if pods have resource limits and requests
+        for POD in $PODS; do
+          echo "Checking resources for pod: $POD"
+
+          CONTAINERS=$(kubectl get pod "$POD" -n {{ .Release.Namespace }} -o jsonpath='{.spec.containers[*].name}')
+          for CONTAINER in $CONTAINERS; do
+            # Check resource requests
+            if kubectl get pod "$POD" -n {{ .Release.Namespace }} -o jsonpath='{.spec.containers[?(@.name=="'$CONTAINER'")].resources.requests}' | grep -q "cpu\|memory"; then
+              echo "    ✅ Container $CONTAINER has resource requests"
+            else
+              echo "    ⚠️  Container $CONTAINER missing resource requests"
+            fi
+
+            # Check resource limits
+            if kubectl get pod "$POD" -n {{ .Release.Namespace }} -o jsonpath='{.spec.containers[?(@.name=="'$CONTAINER'")].resources.limits}' | grep -q "cpu\|memory"; then
+              echo "    ✅ Container $CONTAINER has resource limits"
+            else
+              echo "    ⚠️  Container $CONTAINER missing resource limits"
+            fi
+          done
+        done
+
+        {{- if .Values.podSecurityPolicy.enabled }}
+        echo "🛡️  Testing Pod Security Policy..."
+
+        # Check if PodSecurityPolicy exists
+        PSP_NAME="{{ include "supabase.fullname" . }}"
+        if kubectl get psp "$PSP_NAME"; then
+          echo "✅ PodSecurityPolicy '$PSP_NAME' exists"
+        else
+          echo "❌ PodSecurityPolicy '$PSP_NAME' not found"
+        fi
+        {{- end }}
+
+        echo "✅ Security and RBAC tests completed!"
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi

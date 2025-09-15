@@ -1,0 +1,22 @@
+{{- if and .Values.rest.enabled .Values.prometheus.additionalScrapeConfigs }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "supabase.fullname" . }}-rest-additional-scrape-configs
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rest
+type: Opaque
+stringData:
+  prometheus-additional.yaml: |
+    - job_name: 'supabase-rest-custom'
+      static_configs:
+        - targets: ['{{ include "supabase.fullname" . }}-rest:{{ .Values.rest.service.port }}']
+      metrics_path: /metrics
+      scrape_interval: 30s
+      scrape_timeout: 10s
+      scheme: http
+      {{- if .Values.rest.additionalScrapeConfigs }}
+      {{- toYaml .Values.rest.additionalScrapeConfigs | nindent 6 }}
+      {{- end }}
+{{- end }}

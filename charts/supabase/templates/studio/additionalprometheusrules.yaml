@@ -1,0 +1,121 @@
+{{- if and .Values.studio.enabled .Values.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "supabase.fullname" . }}-studio-rules
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: studio
+    {{- if .Values.prometheusRule.additionalLabels }}
+    {{- toYaml .Values.prometheusRule.additionalLabels | nindent 4 }}
+    {{- end }}
+  {{- with .Values.prometheusRule.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  groups:
+    - name: supabase.studio.rules
+      interval: {{ .Values.prometheusRule.interval | default "30s" }}
+      rules:
+        # Studio service availability
+        - alert: SupabaseStudioDown
+          expr: up{job="supabase-studio"} == 0
+          for: {{ .Values.prometheusRule.studio.downFor | default "1m" }}
+          labels:
+            severity: critical
+            service: studio
+            component: supabase
+          annotations:
+            summary: "Supabase Studio service is down"
+            description: "Supabase Studio service has been down for more than 1 minute in namespace {{ .Release.Namespace }}."
+
+        # High request rate
+        - alert: SupabaseStudioHighRequestRate
+          expr: rate(http_requests_total{job="supabase-studio"}[5m]) > {{ .Values.prometheusRule.studio.highRequestRate | default 100 }}
+          for: {{ .Values.prometheusRule.studio.highRequestRateFor | default "2m" }}
+          labels:
+            severity: warning
+            service: studio
+            component: supabase
+          annotations:
+            summary: "High request rate on Supabase Studio"
+            description: "Supabase Studio is receiving {{ "{{ $value }}" }} requests per second, which is above the threshold of {{ .Values.prometheusRule.studio.highRequestRate | default 100 }}."
+
+        # High error rate
+        - alert: SupabaseStudioHighErrorRate
+          expr: |
+            (
+              rate(http_requests_total{job="supabase-studio",code=~"5.."}[5m]) /
+              rate(http_requests_total{job="supabase-studio"}[5m])
+            ) * 100 > {{ .Values.prometheusRule.studio.highErrorRate | default 5 }}
+          for: {{ .Values.prometheusRule.studio.highErrorRateFor | default "2m" }}
+          labels:
+            severity: warning
+            service: studio
+            component: supabase
+          annotations:
+            summary: "High error rate on Supabase Studio"
+            description: "Supabase Studio error rate is {{ "{{ $value }}" }}%, which is above the threshold of {{ .Values.prometheusRule.studio.highErrorRate | default 5 }}%."
+
+        # High response time
+        - alert: SupabaseStudioHighResponseTime
+          expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="supabase-studio"}[5m])) > {{ .Values.prometheusRule.studio.highResponseTime | default 1 }}
+          for: {{ .Values.prometheusRule.studio.highResponseTimeFor | default "2m" }}
+          labels:
+            severity: warning
+            service: studio
+            component: supabase
+          annotations:
+            summary: "High response time on Supabase Studio"
+            description: "Supabase Studio 95th percentile response time is {{ "{{ $value }}" }}s, which is above the threshold of {{ .Values.prometheusRule.studio.highResponseTime | default 1 }}s."
+
+        # High memory usage
+        - alert: SupabaseStudioHighMemoryUsage
+          expr: |
+            (
+              container_memory_working_set_bytes{pod=~".*studio.*",container!="POD",container!=""} /
+              container_spec_memory_limit_bytes{pod=~".*studio.*",container!="POD",container!=""}
+            ) * 100 > {{ .Values.prometheusRule.studio.highMemoryUsage | default 80 }}
+          for: {{ .Values.prometheusRule.studio.highMemoryUsageFor | default "2m" }}
+          labels:
+            severity: warning
+            service: studio
+            component: supabase
+          annotations:
+            summary: "High memory usage on Supabase Studio"
+            description: "Supabase Studio memory usage is {{ "{{ $value }}" }}%, which is above the threshold of {{ .Values.prometheusRule.studio.highMemoryUsage | default 80 }}%."
+
+        # High CPU usage
+        - alert: SupabaseStudioHighCPUUsage
+          expr: |
+            (
+              rate(container_cpu_usage_seconds_total{pod=~".*studio.*",container!="POD",container!=""}[5m]) /
+              container_spec_cpu_quota{pod=~".*studio.*",container!="POD",container!=""} * container_spec_cpu_period{pod=~".*studio.*",container!="POD",container!=""}
+            ) * 100 > {{ .Values.prometheusRule.studio.highCPUUsage | default 80 }}
+          for: {{ .Values.prometheusRule.studio.highCPUUsageFor | default "2m" }}
+          labels:
+            severity: warning
+            service: studio
+            component: supabase
+          annotations:
+            summary: "High CPU usage on Supabase Studio"
+            description: "Supabase Studio CPU usage is {{ "{{ $value }}" }}%, which is above the threshold of {{ .Values.prometheusRule.studio.highCPUUsage | default 80 }}%."
+
+        # Pod restart frequency
+        - alert: SupabaseStudioPodRestartingFrequently
+          expr: rate(kube_pod_container_status_restarts_total{pod=~".*studio.*"}[15m]) > {{ .Values.prometheusRule.studio.podRestartRate | default 0.1 }}
+          for: {{ .Values.prometheusRule.studio.podRestartRateFor | default "2m" }}
+          labels:
+            severity: warning
+            service: studio
+            component: supabase
+          annotations:
+            summary: "Supabase Studio pod restarting frequently"
+            description: "Supabase Studio pod {{ "{{ $labels.pod }}" }} is restarting {{ "{{ $value }}" }} times per minute."
+
+        {{- if .Values.prometheusRule.studio.additionalRules }}
+        # Additional custom rules
+        {{- toYaml .Values.prometheusRule.studio.additionalRules | nindent 8 }}
+        {{- end }}
+{{- end }}

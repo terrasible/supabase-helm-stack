@@ -1,0 +1,49 @@
+{{- if and .Values.studio.enabled .Values.studio.route .Values.studio.route.enabled }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "supabase.fullname" . }}-studio
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: studio
+  {{- with .Values.studio.route.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.studio.route.host }}
+  host: {{ .Values.studio.route.host }}
+  {{- else if .Values.studio.route.host }}
+  host: {{ .Values.studio.route.host }}
+  {{- end }}
+  {{- if .Values.studio.route.subdomain }}
+  subdomain: {{ .Values.studio.route.subdomain }}
+  {{- else if .Values.studio.route.subdomain }}
+  subdomain: {{ .Values.studio.route.subdomain }}
+  {{- end }}
+  {{- if .Values.studio.route.path }}
+  path: {{ .Values.studio.route.path }}
+  {{- else if .Values.studio.route.path }}
+  path: {{ .Values.studio.route.path }}
+  {{- end }}
+  to:
+    kind: Service
+    name: {{ include "supabase.fullname" . }}-studio
+    weight: 100
+  port:
+    targetPort: {{ .Values.studio.route.targetPort | default "http" }}
+  {{- if .Values.studio.route.tls }}
+  tls:
+    {{- if .Values.studio.route.tls }}
+    {{- with .Values.studio.route.tls }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+
+    {{- end }}
+  {{- end }}
+  {{- if .Values.studio.route.wildcardPolicy }}
+  wildcardPolicy: {{ .Values.studio.route.wildcardPolicy }}
+  {{- else if .Values.studio.route.wildcardPolicy }}
+  wildcardPolicy: {{ .Values.studio.route.wildcardPolicy }}
+  {{- end }}
+{{- end }}

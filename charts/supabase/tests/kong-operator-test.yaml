@@ -1,0 +1,118 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "supabase.fullname" . }}-kong-operator-test"
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+  - name: kong-operator-test
+    image: curlimages/curl:8.5.0
+    command: ["/bin/sh"]
+    args:
+      - -c
+      - |
+        set -e
+        echo "🧪 Testing Kong Operator Integration..."
+
+        {{- if .Values.kongOperator.enabled }}
+        # Test Kong Gateway connectivity
+        KONG_SERVICE="{{ .Values.kongOperator.serviceName }}.{{ .Values.kongOperator.serviceNamespace }}.svc.cluster.local"
+        KONG_PORT="{{ .Values.kongOperator.servicePort }}"
+        KONG_ADMIN_SERVICE="{{ .Values.kongOperator.admin.serviceName }}.{{ .Values.kongOperator.serviceNamespace }}.svc.cluster.local"
+        KONG_ADMIN_PORT="{{ .Values.kongOperator.admin.servicePort }}"
+
+        echo "📡 Testing Kong Gateway connectivity..."
+        if curl -f -s --max-time 10 "http://$KONG_SERVICE:$KONG_PORT/" > /dev/null; then
+          echo "✅ Kong Gateway is accessible at $KONG_SERVICE:$KONG_PORT"
+        else
+          echo "❌ Kong Gateway is not accessible at $KONG_SERVICE:$KONG_PORT"
+          exit 1
+        fi
+
+        echo "🔧 Testing Kong Admin API..."
+        if curl -f -s --max-time 10 "http://$KONG_ADMIN_SERVICE:$KONG_ADMIN_PORT/status" > /dev/null; then
+          echo "✅ Kong Admin API is accessible"
+
+          # Get Kong status
+          KONG_STATUS=$(curl -s "http://$KONG_ADMIN_SERVICE:$KONG_ADMIN_PORT/status")
+          echo "📊 Kong Status: $KONG_STATUS"
+        else
+          echo "❌ Kong Admin API is not accessible"
+          exit 1
+        fi
+
+        echo "🛣️  Testing Supabase service routes through Kong..."
+
+        # Test REST API route
+        echo "Testing REST API route..."
+        if curl -f -s --max-time 10 "http://$KONG_SERVICE:$KONG_PORT/rest/v1/" > /dev/null; then
+          echo "✅ REST API route is working"
+        else
+          echo "⚠️  REST API route may not be configured yet"
+        fi
+
+        # Test Auth API route
+        echo "Testing Auth API route..."
+        if curl -f -s --max-time 10 "http://$KONG_SERVICE:$KONG_PORT/auth/v1/health" > /dev/null; then
+          echo "✅ Auth API route is working"
+        else
+          echo "⚠️  Auth API route may not be configured yet"
+        fi
+
+        # Test Storage API route
+        echo "Testing Storage API route..."
+        if curl -f -s --max-time 10 "http://$KONG_SERVICE:$KONG_PORT/storage/v1/" > /dev/null; then
+          echo "✅ Storage API route is working"
+        else
+          echo "⚠️  Storage API route may not be configured yet"
+        fi
+
+        # Test Realtime route
+        echo "Testing Realtime route..."
+        if curl -f -s --max-time 10 "http://$KONG_SERVICE:$KONG_PORT/realtime/v1/" > /dev/null; then
+          echo "✅ Realtime route is working"
+        else
+          echo "⚠️  Realtime route may not be configured yet"
+        fi
+
+        # Test Studio route
+        echo "Testing Studio route..."
+        if curl -f -s --max-time 10 "http://$KONG_SERVICE:$KONG_PORT/studio" > /dev/null; then
+          echo "✅ Studio route is working"
+        else
+          echo "⚠️  Studio route may not be configured yet"
+        fi
+
+        echo "🎯 Testing Kong plugins and configuration..."
+
+        # Check if plugins are loaded
+        PLUGINS=$(curl -s "http://$KONG_ADMIN_SERVICE:$KONG_ADMIN_PORT/plugins")
+        echo "📦 Loaded plugins: $PLUGINS"
+
+        # Check services configuration
+        SERVICES=$(curl -s "http://$KONG_ADMIN_SERVICE:$KONG_ADMIN_PORT/services")
+        echo "🔗 Configured services: $SERVICES"
+
+        # Check routes configuration
+        ROUTES=$(curl -s "http://$KONG_ADMIN_SERVICE:$KONG_ADMIN_PORT/routes")
+        echo "🛤️  Configured routes: $ROUTES"
+
+        echo "✅ Kong Operator integration tests completed successfully!"
+
+        {{- else }}
+        echo "⚠️  Kong Operator integration is disabled. Skipping tests."
+        echo "To enable Kong Operator integration, set kongOperator.enabled=true"
+        {{- end }}
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi

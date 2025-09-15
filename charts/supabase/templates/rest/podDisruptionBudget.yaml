@@ -1,0 +1,24 @@
+{{- if and .Values.rest.enabled .Values.rest.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "supabase.fullname" . }}-rest
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rest
+  {{- with .Values.rest.podDisruptionBudget.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.rest.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.rest.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.rest.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.rest.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "supabase.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: rest
+{{- end }}

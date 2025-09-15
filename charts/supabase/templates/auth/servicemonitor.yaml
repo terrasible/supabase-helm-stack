@@ -1,0 +1,69 @@
+{{- if and .Values.auth.enabled .Values.auth.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "supabase.fullname" . }}-auth
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: auth
+    {{- with .Values.auth.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.auth.serviceMonitor.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "supabase.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: auth
+  endpoints:
+    {{- range .Values.auth.serviceMonitor.endpoints }}
+    - port: {{ .port }}
+      {{- if .interval }}
+      interval: {{ .interval }}
+      {{- end }}
+      {{- if .path }}
+      path: {{ .path }}
+      {{- end }}
+      {{- if .scheme }}
+      scheme: {{ .scheme }}
+      {{- end }}
+      {{- if .scrapeTimeout }}
+      scrapeTimeout: {{ .scrapeTimeout }}
+      {{- end }}
+      {{- if .honorLabels }}
+      honorLabels: {{ .honorLabels }}
+      {{- end }}
+      {{- if .metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml .metricRelabelings | nindent 8 }}
+      {{- end }}
+      {{- if .relabelings }}
+      relabelings:
+        {{- toYaml .relabelings | nindent 8 }}
+      {{- end }}
+    {{- end }}
+  {{- if .Values.auth.serviceMonitor.jobLabel }}
+  jobLabel: {{ .Values.auth.serviceMonitor.jobLabel }}
+  {{- end }}
+  {{- if .Values.auth.serviceMonitor.targetLabels }}
+  targetLabels:
+    {{- toYaml .Values.auth.serviceMonitor.targetLabels | nindent 4 }}
+  {{- end }}
+  {{- if .Values.auth.serviceMonitor.podTargetLabels }}
+  podTargetLabels:
+    {{- toYaml .Values.auth.serviceMonitor.podTargetLabels | nindent 4 }}
+  {{- end }}
+  {{- if .Values.auth.serviceMonitor.namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml .Values.auth.serviceMonitor.namespaceSelector | nindent 4 }}
+  {{- end }}
+  {{- if .Values.auth.serviceMonitor.sampleLimit }}
+  sampleLimit: {{ .Values.auth.serviceMonitor.sampleLimit }}
+  {{- end }}
+  {{- if .Values.auth.serviceMonitor.targetLimit }}
+  targetLimit: {{ .Values.auth.serviceMonitor.targetLimit }}
+  {{- end }}
+{{- end }}

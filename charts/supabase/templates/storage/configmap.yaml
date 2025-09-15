@@ -1,0 +1,53 @@
+{{- if .Values.storage.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "supabase.fullname" . }}-storage-config
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: storage
+  {{- if and .Values.storage.configMap .Values.storage.configMap.annotations }}
+  {{- with .Values.storage.configMap.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+data:
+  {{- if .Values.storage.config }}
+  {{- range $key, $value := .Values.storage.config }}
+  {{ $key }}: {{ $value | toString | quote }}
+  {{- end }}
+  {{- else }}
+  # Storage API Configuration
+  ANON_KEY: {{ .Values.global.anonKey | default "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0" }}
+  SERVICE_ROLE_KEY: {{ .Values.global.serviceRoleKey | default "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU" }}
+  PGRST_JWT_SECRET: {{ .Values.global.jwtSecret | default "super-secret-jwt-token-with-at-least-32-characters-long" }}
+  DATABASE_URL: {{ .Values.global.databaseUrl | default "postgresql://postgres:postgres@supabase-db:5432/postgres" }}
+  PGRST_DB_URI: {{ .Values.global.databaseUrl | default "postgresql://postgres:postgres@supabase-db:5432/postgres" }}
+  PGRST_DB_SCHEMAS: {{ (.Values.storage.config).dbSchemas | default "storage,graphql_public" }}
+  PGRST_DB_ANON_ROLE: {{ (.Values.storage.config).dbAnonRole | default "anon" }}
+  PGRST_JWT_AUD: {{ (.Values.storage.config).jwtAud | default "authenticated" }}
+  GOTRUE_URL: {{ (.Values.storage.config).gotrueUrl | default "http://supabase-auth:9999" }}
+  GOTRUE_JWT_AUD: {{ (.Values.storage.config).gotrueJwtAud | default "authenticated" }}
+  GOTRUE_JWT_EXP: "{{ (.Values.storage.config).gotrueJwtExp | default "3600" }}"
+  S3_PROTOCOL: {{ (.Values.storage.config).s3Protocol | default "http" }}
+  S3_ENDPOINT: {{ (.Values.storage.config).s3Endpoint | default "minio:9000" }}
+  S3_ACCESS_KEY_ID: {{ (.Values.storage.config).s3AccessKeyId | default "minioadmin" }}
+  S3_SECRET_ACCESS_KEY: {{ (.Values.storage.config).s3SecretAccessKey | default "minioadmin" }}
+  S3_BUCKET: {{ (.Values.storage.config).s3Bucket | default "supabase" }}
+  S3_REGION: {{ (.Values.storage.config).s3Region | default "us-east-1" }}
+  STORAGE_BACKEND: {{ (.Values.storage.config).storageBackend | default "s3" }}
+  FILE_SIZE_LIMIT: "{{ (.Values.storage.config).fileSizeLimit | default "52428800" }}"
+  STORAGE_S3_FORCE_PATH_STYLE: "{{ (.Values.storage.config).s3ForcePathStyle | default "true" }}"
+  TENANT_ID: {{ (.Values.storage.config).tenantId | default "stub_tenant" }}
+  REGION: {{ (.Values.storage.config).region | default "stub_region" }}
+  GLOBAL_S3_BUCKET: {{ (.Values.storage.config).globalS3Bucket | default "stub_global_bucket" }}
+  ENABLE_IMAGE_TRANSFORMATION: "{{ (.Values.storage.config).enableImageTransformation | default "true" }}"
+  IMGPROXY_URL: {{ (.Values.storage.config).imgproxyUrl | default "http://imgproxy:8080" }}
+  {{- end }}
+  {{- if and .Values.storage.configMap .Values.storage.configMap.additionalData }}
+  {{- range $key, $value := .Values.storage.configMap.additionalData }}
+  {{ $key }}: {{ $value | toString | quote }}
+  {{- end }}
+  {{- end }}
+{{- end }}

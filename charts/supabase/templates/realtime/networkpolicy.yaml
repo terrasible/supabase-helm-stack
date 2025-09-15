@@ -1,0 +1,90 @@
+{{- if and .Values.realtime.enabled .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "supabase.fullname" . }}-realtime
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: realtime
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "supabase.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: realtime
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from Kong Gateway (via Kong Operator)
+    {{- if .Values.kongOperator.enabled }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: {{ .Values.kongOperator.serviceNamespace }}
+        - podSelector:
+            matchLabels:
+              app: kong
+    {{- end }}
+      ports:
+        - protocol: TCP
+          port: 4000
+    # Allow traffic from other Supabase components
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "supabase.selectorLabels" . | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 4000
+    # Allow Prometheus scraping
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: {{ .Values.prometheus.namespace | default "monitoring" }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: {{ .Values.realtime.service.metricsPort | default 9090 }}
+    {{- if .Values.networkPolicy.ingress.additionalRules }}
+    {{- toYaml .Values.networkPolicy.ingress.additionalRules | nindent 4 }}
+    {{- end }}
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow database connections
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "supabase.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow external database connections if using external DB
+    {{- if .Values.postgresql.external.enabled }}
+    - to: []
+      ports:
+        - protocol: TCP
+          port: {{ .Values.postgresql.external.port | default 5432 }}
+    {{- end }}
+    # Allow HTTPS traffic for external services
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+    # Allow HTTP traffic for health checks and webhooks
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 80
+    {{- if .Values.networkPolicy.egress.additionalRules }}
+    {{- toYaml .Values.networkPolicy.egress.additionalRules | nindent 4 }}
+    {{- end }}
+{{- end }}

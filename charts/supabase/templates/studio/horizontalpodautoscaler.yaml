@@ -1,0 +1,51 @@
+{{- if and .Values.studio.enabled .Values.studio.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "supabase.fullname" . }}-studio
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: studio
+  {{- with .Values.studio.autoscaling.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "supabase.fullname" . }}-studio
+  minReplicas: {{ .Values.studio.autoscaling.minReplicas | default 1 }}
+  maxReplicas: {{ .Values.studio.autoscaling.maxReplicas | default 10 }}
+  metrics:
+    {{- if .Values.studio.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.studio.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.studio.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.studio.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+    {{- with .Values.studio.autoscaling.customMetrics }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- if .Values.studio.autoscaling.behavior }}
+  behavior:
+    {{- with .Values.studio.autoscaling.behavior.scaleDown }}
+    scaleDown:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.studio.autoscaling.behavior.scaleUp }}
+    scaleUp:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,94 @@
+{{- if and .Values.realtime.enabled .Values.realtime.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "supabase.fullname" . }}-realtime
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: realtime
+    {{- with .Values.realtime.serviceMonitor.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.realtime.serviceMonitor.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.realtime.serviceMonitor.jobLabel }}
+  jobLabel: {{ .Values.realtime.serviceMonitor.jobLabel }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "supabase.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: realtime
+      {{- with .Values.realtime.serviceMonitor.selector }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+  endpoints:
+    - port: {{ .Values.realtime.serviceMonitor.port | default "metrics" }}
+      {{- if .Values.realtime.serviceMonitor.interval }}
+      interval: {{ .Values.realtime.serviceMonitor.interval }}
+      {{- end }}
+      {{- if .Values.realtime.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ .Values.realtime.serviceMonitor.scrapeTimeout }}
+      {{- end }}
+      path: {{ .Values.realtime.serviceMonitor.path | default "/metrics" }}
+      {{- if .Values.realtime.serviceMonitor.scheme }}
+      scheme: {{ .Values.realtime.serviceMonitor.scheme }}
+      {{- end }}
+      {{- if .Values.realtime.serviceMonitor.tlsConfig }}
+      tlsConfig:
+        {{- toYaml .Values.realtime.serviceMonitor.tlsConfig | nindent 8 }}
+      {{- end }}
+      {{- if .Values.realtime.serviceMonitor.bearerTokenFile }}
+      bearerTokenFile: {{ .Values.realtime.serviceMonitor.bearerTokenFile }}
+      {{- end }}
+      {{- if .Values.realtime.serviceMonitor.bearerTokenSecret }}
+      bearerTokenSecret:
+        {{- toYaml .Values.realtime.serviceMonitor.bearerTokenSecret | nindent 8 }}
+      {{- end }}
+      {{- if .Values.realtime.serviceMonitor.basicAuth }}
+      basicAuth:
+        {{- toYaml .Values.realtime.serviceMonitor.basicAuth | nindent 8 }}
+      {{- end }}
+      {{- if .Values.realtime.serviceMonitor.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml .Values.realtime.serviceMonitor.metricRelabelings | nindent 8 }}
+      {{- end }}
+      {{- if .Values.realtime.serviceMonitor.relabelings }}
+      relabelings:
+        {{- toYaml .Values.realtime.serviceMonitor.relabelings | nindent 8 }}
+      {{- end }}
+      {{- if .Values.realtime.serviceMonitor.proxyUrl }}
+      proxyUrl: {{ .Values.realtime.serviceMonitor.proxyUrl }}
+      {{- end }}
+      {{- if .Values.realtime.serviceMonitor.honorLabels }}
+      honorLabels: {{ .Values.realtime.serviceMonitor.honorLabels }}
+      {{- end }}
+      {{- if .Values.realtime.serviceMonitor.honorTimestamps }}
+      honorTimestamps: {{ .Values.realtime.serviceMonitor.honorTimestamps }}
+      {{- end }}
+  {{- if .Values.realtime.serviceMonitor.targetLabels }}
+  targetLabels:
+    {{- toYaml .Values.realtime.serviceMonitor.targetLabels | nindent 4 }}
+  {{- end }}
+  {{- if .Values.realtime.serviceMonitor.podTargetLabels }}
+  podTargetLabels:
+    {{- toYaml .Values.realtime.serviceMonitor.podTargetLabels | nindent 4 }}
+  {{- end }}
+  {{- if .Values.realtime.serviceMonitor.sampleLimit }}
+  sampleLimit: {{ .Values.realtime.serviceMonitor.sampleLimit }}
+  {{- end }}
+  {{- if .Values.realtime.serviceMonitor.targetLimit }}
+  targetLimit: {{ .Values.realtime.serviceMonitor.targetLimit }}
+  {{- end }}
+  {{- if .Values.realtime.serviceMonitor.labelLimit }}
+  labelLimit: {{ .Values.realtime.serviceMonitor.labelLimit }}
+  {{- end }}
+  {{- if .Values.realtime.serviceMonitor.labelNameLengthLimit }}
+  labelNameLengthLimit: {{ .Values.realtime.serviceMonitor.labelNameLengthLimit }}
+  {{- end }}
+  {{- if .Values.realtime.serviceMonitor.labelValueLengthLimit }}
+  labelValueLengthLimit: {{ .Values.realtime.serviceMonitor.labelValueLengthLimit }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,177 @@
+{{- if and .Values.meta.enabled .Values.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "supabase.fullname" . }}-meta
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: meta
+    {{- if .Values.prometheusRule.additionalLabels }}
+    {{- toYaml .Values.prometheusRule.additionalLabels | nindent 4 }}
+    {{- end }}
+  {{- with .Values.prometheusRule.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  groups:
+    - name: supabase.meta.availability
+      rules:
+        - alert: SupabaseMetaDown
+          expr: up{job="{{ include "supabase.fullname" . }}-meta"} == 0
+          for: {{ .Values.prometheusRule.rules.metaDown.for | default "5m" }}
+          labels:
+            severity: {{ .Values.prometheusRule.rules.metaDown.severity | default "critical" }}
+            service: meta
+            component: supabase
+          annotations:
+            summary: "Supabase Meta service is down"
+            description: "Supabase Meta service has been down for more than {{ .Values.prometheusRule.rules.metaDown.for | default "5m" }}."
+
+        - alert: SupabaseMetaHighErrorRate
+          expr: |
+            (
+              rate(http_requests_total{job="{{ include "supabase.fullname" . }}-meta",code=~"5.."}[5m])
+              /
+              rate(http_requests_total{job="{{ include "supabase.fullname" . }}-meta"}[5m])
+            ) > {{ .Values.prometheusRule.rules.metaHighErrorRate.threshold | default "0.1" }}
+          for: {{ .Values.prometheusRule.rules.metaHighErrorRate.for | default "5m" }}
+          labels:
+            severity: {{ .Values.prometheusRule.rules.metaHighErrorRate.severity | default "warning" }}
+            service: meta
+            component: supabase
+          annotations:
+            summary: "High error rate in Supabase Meta service"
+            description: "Supabase Meta service error rate is {{ "{{" }} $value | humanizePercentage {{ "}}" }} for more than {{ .Values.prometheusRule.rules.metaHighErrorRate.for | default "5m" }}."
+
+    - name: supabase.meta.performance
+      rules:
+        - alert: SupabaseMetaHighLatency
+          expr: |
+            histogram_quantile(0.95,
+              rate(http_request_duration_seconds_bucket{job="{{ include "supabase.fullname" . }}-meta"}[5m])
+            ) > {{ .Values.prometheusRule.rules.metaHighLatency.threshold | default "1" }}
+          for: {{ .Values.prometheusRule.rules.metaHighLatency.for | default "10m" }}
+          labels:
+            severity: {{ .Values.prometheusRule.rules.metaHighLatency.severity | default "warning" }}
+            service: meta
+            component: supabase
+          annotations:
+            summary: "High latency in Supabase Meta service"
+            description: "Supabase Meta service 95th percentile latency is {{ "{{" }} $value {{ "}}" }}s for more than {{ .Values.prometheusRule.rules.metaHighLatency.for | default "10m" }}."
+
+        - alert: SupabaseMetaHighRequestRate
+          expr: |
+            rate(http_requests_total{job="{{ include "supabase.fullname" . }}-meta"}[5m]) > {{ .Values.prometheusRule.rules.metaHighRequestRate.threshold | default "1000" }}
+          for: {{ .Values.prometheusRule.rules.metaHighRequestRate.for | default "5m" }}
+          labels:
+            severity: {{ .Values.prometheusRule.rules.metaHighRequestRate.severity | default "warning" }}
+            service: meta
+            component: supabase
+          annotations:
+            summary: "High request rate in Supabase Meta service"
+            description: "Supabase Meta service is receiving {{ "{{" }} $value {{ "}}" }} requests per second for more than {{ .Values.prometheusRule.rules.metaHighRequestRate.for | default "5m" }}."
+
+    - name: supabase.meta.resources
+      rules:
+        - alert: SupabaseMetaHighMemoryUsage
+          expr: |
+            (
+              container_memory_working_set_bytes{pod=~"{{ include "supabase.fullname" . }}-meta-.*",container="{{ .Chart.Name }}-meta"}
+              /
+              container_spec_memory_limit_bytes{pod=~"{{ include "supabase.fullname" . }}-meta-.*",container="{{ .Chart.Name }}-meta"}
+            ) > {{ .Values.prometheusRule.rules.metaHighMemoryUsage.threshold | default "0.9" }}
+          for: {{ .Values.prometheusRule.rules.metaHighMemoryUsage.for | default "5m" }}
+          labels:
+            severity: {{ .Values.prometheusRule.rules.metaHighMemoryUsage.severity | default "warning" }}
+            service: meta
+            component: supabase
+          annotations:
+            summary: "High memory usage in Supabase Meta service"
+            description: "Supabase Meta service memory usage is {{ "{{" }} $value | humanizePercentage {{ "}}" }} for more than {{ .Values.prometheusRule.rules.metaHighMemoryUsage.for | default "5m" }}."
+
+        - alert: SupabaseMetaHighCPUUsage
+          expr: |
+            (
+              rate(container_cpu_usage_seconds_total{pod=~"{{ include "supabase.fullname" . }}-meta-.*",container="{{ .Chart.Name }}-meta"}[5m])
+              /
+              container_spec_cpu_quota{pod=~"{{ include "supabase.fullname" . }}-meta-.*",container="{{ .Chart.Name }}-meta"}
+              * container_spec_cpu_period{pod=~"{{ include "supabase.fullname" . }}-meta-.*",container="{{ .Chart.Name }}-meta"}
+            ) > {{ .Values.prometheusRule.rules.metaHighCPUUsage.threshold | default "0.8" }}
+          for: {{ .Values.prometheusRule.rules.metaHighCPUUsage.for | default "5m" }}
+          labels:
+            severity: {{ .Values.prometheusRule.rules.metaHighCPUUsage.severity | default "warning" }}
+            service: meta
+            component: supabase
+          annotations:
+            summary: "High CPU usage in Supabase Meta service"
+            description: "Supabase Meta service CPU usage is {{ "{{" }} $value | humanizePercentage {{ "}}" }} for more than {{ .Values.prometheusRule.rules.metaHighCPUUsage.for | default "5m" }}."
+
+    - name: supabase.meta.database
+      rules:
+        - alert: SupabaseMetaDatabaseConnectionFailure
+          expr: |
+            increase(pg_meta_database_connection_errors_total{job="{{ include "supabase.fullname" . }}-meta"}[5m]) > {{ .Values.prometheusRule.rules.metaDatabaseConnectionFailure.threshold | default "5" }}
+          for: {{ .Values.prometheusRule.rules.metaDatabaseConnectionFailure.for | default "2m" }}
+          labels:
+            severity: {{ .Values.prometheusRule.rules.metaDatabaseConnectionFailure.severity | default "critical" }}
+            service: meta
+            component: supabase
+          annotations:
+            summary: "Database connection failures in Supabase Meta service"
+            description: "Supabase Meta service has {{ "{{" }} $value {{ "}}" }} database connection failures in the last 5 minutes."
+
+        - alert: SupabaseMetaDatabaseSlowQueries
+          expr: |
+            histogram_quantile(0.95,
+              rate(pg_meta_database_query_duration_seconds_bucket{job="{{ include "supabase.fullname" . }}-meta"}[5m])
+            ) > {{ .Values.prometheusRule.rules.metaDatabaseSlowQueries.threshold | default "5" }}
+          for: {{ .Values.prometheusRule.rules.metaDatabaseSlowQueries.for | default "5m" }}
+          labels:
+            severity: {{ .Values.prometheusRule.rules.metaDatabaseSlowQueries.severity | default "warning" }}
+            service: meta
+            component: supabase
+          annotations:
+            summary: "Slow database queries in Supabase Meta service"
+            description: "Supabase Meta service 95th percentile database query duration is {{ "{{" }} $value {{ "}}" }}s for more than {{ .Values.prometheusRule.rules.metaDatabaseSlowQueries.for | default "5m" }}."
+
+    - name: supabase.meta.pods
+      rules:
+        - alert: SupabaseMetaPodRestartingTooOften
+          expr: |
+            rate(kube_pod_container_status_restarts_total{pod=~"{{ include "supabase.fullname" . }}-meta-.*"}[15m]) > {{ .Values.prometheusRule.rules.metaPodRestartingTooOften.threshold | default "0.1" }}
+          for: {{ .Values.prometheusRule.rules.metaPodRestartingTooOften.for | default "5m" }}
+          labels:
+            severity: {{ .Values.prometheusRule.rules.metaPodRestartingTooOften.severity | default "warning" }}
+            service: meta
+            component: supabase
+          annotations:
+            summary: "Supabase Meta pod restarting too often"
+            description: "Supabase Meta pod {{ "{{" }} $labels.pod {{ "}}" }} is restarting {{ "{{" }} $value {{ "}}" }} times per second."
+
+    # Additional custom rules
+    {{- if .Values.meta.prometheusRule.additionalRules }}
+    {{- range .Values.meta.prometheusRule.additionalRules }}
+    - name: {{ .name }}
+      {{- if .interval }}
+      interval: {{ .interval }}
+      {{- end }}
+      rules:
+        {{- range .rules }}
+        - alert: {{ .alert }}
+          expr: {{ .expr | quote }}
+          {{- if .for }}
+          for: {{ .for }}
+          {{- end }}
+          {{- if .labels }}
+          labels:
+            {{- toYaml .labels | nindent 12 }}
+          {{- end }}
+          {{- if .annotations }}
+          annotations:
+            {{- toYaml .annotations | nindent 12 }}
+          {{- end }}
+        {{- end }}
+    {{- end }}
+    {{- end }}
+{{- end }}

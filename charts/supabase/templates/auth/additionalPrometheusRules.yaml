@@ -1,0 +1,95 @@
+{{- if and .Values.auth.enabled .Values.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "supabase.fullname" . }}-auth-rules
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: auth
+    {{- with .Values.prometheusRule.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.prometheusRule.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  groups:
+    - name: supabase.auth.rules
+      rules:
+        # Auth service availability
+        - alert: SupabaseAuthDown
+          expr: up{job="supabase-auth"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            service: auth
+          annotations:
+            summary: "Supabase Auth service is down"
+            description: "Supabase Auth service has been down for more than 5 minutes."
+
+        # High error rate
+        - alert: SupabaseAuthHighErrorRate
+          expr: |
+            (
+              rate(http_requests_total{job="supabase-auth",code=~"5.."}[5m]) /
+              rate(http_requests_total{job="supabase-auth"}[5m])
+            ) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            service: auth
+          annotations:
+            summary: "High error rate in Supabase Auth"
+            description: "Supabase Auth error rate is above 10% for more than 5 minutes."
+
+        # High response time
+        - alert: SupabaseAuthHighLatency
+          expr: |
+            histogram_quantile(0.95,
+              rate(http_request_duration_seconds_bucket{job="supabase-auth"}[5m])
+            ) > 2
+          for: 5m
+          labels:
+            severity: warning
+            service: auth
+          annotations:
+            summary: "High latency in Supabase Auth"
+            description: "Supabase Auth 95th percentile latency is above 2 seconds for more than 5 minutes."
+
+        # High memory usage
+        - alert: SupabaseAuthHighMemoryUsage
+          expr: |
+            (
+              container_memory_working_set_bytes{pod=~".*-auth-.*"} /
+              container_spec_memory_limit_bytes{pod=~".*-auth-.*"}
+            ) > 0.9
+          for: 5m
+          labels:
+            severity: warning
+            service: auth
+          annotations:
+            summary: "High memory usage in Supabase Auth"
+            description: "Supabase Auth memory usage is above 80% for more than 5 minutes."
+
+        # High CPU usage
+        - alert: SupabaseAuthHighCPUUsage
+          expr: |
+            (
+              rate(container_cpu_usage_seconds_total{pod=~".*-auth-.*"}[5m]) /
+              container_spec_cpu_quota{pod=~".*-auth-.*"} * container_spec_cpu_period{pod=~".*-auth-.*"}
+            ) > 0.9
+          for: 5m
+          labels:
+            severity: warning
+            service: auth
+          annotations:
+            summary: "High CPU usage in Supabase Auth"
+            description: "Supabase Auth CPU usage is above 80% for more than 5 minutes."
+
+    {{- if .Values.auth.prometheusRules.additionalRules }}
+    {{- range .Values.auth.prometheusRules.additionalRules }}
+    - {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- end }}
+{{- end }}

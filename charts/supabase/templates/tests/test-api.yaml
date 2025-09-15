@@ -1,0 +1,177 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "supabase.fullname" . }}-test-api"
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "3"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: test-api
+      image: curlimages/curl:latest
+      env:
+        - name: SUPABASE_URL
+          value: "http://{{ .Values.kongOperator.serviceName }}.{{ .Values.kongOperator.serviceNamespace }}:{{ .Values.kongOperator.servicePort }}"
+        - name: SUPABASE_ANON_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "supabase.secretName" . }}
+              key: {{ if and .Values.secrets .Values.secrets.jwt }}{{ .Values.secrets.jwt.anonKey | default "jwt-anon-key" }}{{ else }}jwt-anon-key{{ end }}
+        - name: SUPABASE_SERVICE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "supabase.secretName" . }}
+              key: {{ if and .Values.secrets .Values.secrets.jwt }}{{ .Values.secrets.jwt.serviceKey | default "jwt-service-key" }}{{ else }}jwt-service-key{{ end }}
+      command: ['sh', '-c']
+      args:
+        - |
+          set -e
+          echo "Testing Supabase API functionality..."
+
+          # Test Kong Gateway routing
+          echo "Testing Kong Gateway routing..."
+          curl -f "$SUPABASE_URL/health" || exit 1
+          echo "✅ Kong Gateway routing is working"
+
+          # Test REST API with anon key
+          echo "Testing REST API with anonymous key..."
+          curl -f -H "apikey: $SUPABASE_ANON_KEY" \
+               -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+               "$SUPABASE_URL/rest/v1/" || exit 1
+          echo "✅ REST API responds to anonymous requests"
+
+          # Test Auth API
+          echo "Testing Auth API endpoints..."
+
+          # Test auth settings endpoint
+          curl -f -H "apikey: $SUPABASE_ANON_KEY" \
+               "$SUPABASE_URL/auth/v1/settings" || exit 1
+          echo "✅ Auth settings endpoint is accessible"
+
+          # Test auth health endpoint
+          curl -f "$SUPABASE_URL/auth/v1/health" || exit 1
+          echo "✅ Auth health endpoint is working"
+
+          # Test Storage API
+          echo "Testing Storage API endpoints..."
+
+          # Test storage health
+          curl -f "$SUPABASE_URL/storage/v1/status" || exit 1
+          echo "✅ Storage status endpoint is working"
+
+          # Test storage buckets endpoint (should return empty list or error for unauthorized)
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+                           -H "apikey: $SUPABASE_ANON_KEY" \
+                           -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+                           "$SUPABASE_URL/storage/v1/bucket")
+
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
+            echo "✅ Storage buckets endpoint is responding correctly (HTTP $HTTP_CODE)"
+          else
+            echo "❌ Storage buckets endpoint returned unexpected status: $HTTP_CODE"
+            exit 1
+          fi
+
+          # Test Realtime API
+          echo "Testing Realtime API endpoints..."
+
+          # Test realtime health
+          curl -f "$SUPABASE_URL/realtime/v1/api/health" || exit 1
+          echo "✅ Realtime health endpoint is working"
+
+          {{- if .Values.functions.enabled }}
+          # Test Functions API (if enabled)
+          echo "Testing Functions API endpoints..."
+
+          # Test functions health
+          curl -f "$SUPABASE_URL/functions/v1/_internal/health" || exit 1
+          echo "✅ Functions health endpoint is working"
+
+          # Test functions list endpoint
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+                           -H "apikey: $SUPABASE_ANON_KEY" \
+                           -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+                           "$SUPABASE_URL/functions/v1/")
+
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
+            echo "✅ Functions list endpoint is responding correctly (HTTP $HTTP_CODE)"
+          else
+            echo "❌ Functions list endpoint returned unexpected status: $HTTP_CODE"
+            exit 1
+          fi
+          {{- end }}
+
+          # Test Meta API
+          echo "Testing Meta API endpoints..."
+
+          # Test meta health
+          curl -f "$SUPABASE_URL/meta/health" || exit 1
+          echo "✅ Meta health endpoint is working"
+
+          # Test CORS headers
+          echo "Testing CORS headers..."
+          CORS_HEADERS=$(curl -s -I -H "Origin: https://example.com" \
+                              -H "apikey: $SUPABASE_ANON_KEY" \
+                              "$SUPABASE_URL/rest/v1/" | grep -i "access-control" || true)
+
+          if [ -n "$CORS_HEADERS" ]; then
+            echo "✅ CORS headers are present"
+          else
+            echo "⚠️ CORS headers not found (this may be expected depending on configuration)"
+          fi
+
+          # Test API versioning
+          echo "Testing API versioning..."
+
+          # Check if REST API returns proper version headers
+          VERSION_HEADER=$(curl -s -I -H "apikey: $SUPABASE_ANON_KEY" \
+                                "$SUPABASE_URL/rest/v1/" | grep -i "content-profile\|accept-profile" || true)
+
+          if [ -n "$VERSION_HEADER" ]; then
+            echo "✅ API versioning headers are present"
+          else
+            echo "⚠️ API versioning headers not found (this may be expected)"
+          fi
+
+          # Test rate limiting (if configured)
+          echo "Testing rate limiting awareness..."
+          RATE_LIMIT_HEADER=$(curl -s -I -H "apikey: $SUPABASE_ANON_KEY" \
+                                   "$SUPABASE_URL/rest/v1/" | grep -i "ratelimit\|x-rate" || true)
+
+          if [ -n "$RATE_LIMIT_HEADER" ]; then
+            echo "✅ Rate limiting headers are present"
+          else
+            echo "⚠️ Rate limiting headers not found (this may be expected)"
+          fi
+
+          # Test service key access (should have elevated permissions)
+          echo "Testing service key access..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+                           -H "apikey: $SUPABASE_SERVICE_KEY" \
+                           -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+                           "$SUPABASE_URL/rest/v1/")
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Service key access is working"
+          else
+            echo "❌ Service key access failed (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+
+          echo "🎉 All API functionality tests completed!"
+  {{- with .Values.nodeSelector }}
+  nodeSelector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.affinity }}
+  affinity:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.tolerations }}
+  tolerations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}

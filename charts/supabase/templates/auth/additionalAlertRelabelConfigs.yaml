@@ -1,0 +1,24 @@
+{{- if and .Values.auth.enabled .Values.alertmanager.additionalAlertRelabelConfigs }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "supabase.fullname" . }}-auth-alert-relabel-configs
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: auth
+type: Opaque
+stringData:
+  alertmanager-additional.yaml: |
+    # Additional alert relabel configs for auth service
+    - source_labels: [__name__]
+      regex: 'supabase_auth_.*'
+      target_label: service
+      replacement: 'auth'
+    - source_labels: [job]
+      regex: 'supabase-auth'
+      target_label: component
+      replacement: 'auth'
+    {{- if .Values.auth.alertRelabelConfigs }}
+    {{- toYaml .Values.auth.alertRelabelConfigs | nindent 4 }}
+    {{- end }}
+{{- end }}
