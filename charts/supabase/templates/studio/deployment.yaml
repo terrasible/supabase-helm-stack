@@ -4,9 +4,9 @@ kind: Deployment
 metadata:
   name: {{ include "supabase.studio.fullname" . }}
   labels:
-    {{- include "supabase.labels" . | nindent 4 }}
+    {{- include "supabase.studio.labels" . | nindent 4 }}
 spec:
-  {{- if not .Values.studio.autoscaling.enabled }}
+  {{- if not (and .Values.studio.autoscaling .Values.studio.autoscaling.enabled) }}
   replicas: {{ .Values.studio.replicaCount }}
   {{- end }}
   selector:
@@ -26,61 +26,44 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "supabase.studio.serviceAccountName" . }}
-      securityContext:
-        {{- toYaml .Values.studio.podSecurityContext | nindent 8 }}
+      {{- if .Values.studio.podSecurityContext }}
+      podSecurityContext:
+        {{- include "supabase.component.podSecurityContext" (dict "Values" .Values "component" "studio" "context" .) | nindent 8 }}
+      {{- end }}
       containers:
-        - name: {{ include "supabase.studio.name" $ }}
-          securityContext:
-            {{- toYaml .Values.studio.securityContext | nindent 12 }}
-          image: "{{ .Values.studio.image.repository }}:{{ .Values.studio.image.tag | default .Chart.AppVersion }}"
+        - name: {{ include "supabase.studio.name" . }}
+          {{- include "supabase.component.securityContext" (dict "Values" .Values "component" "studio" "context" .) | nindent 10 }}
+          image: "{{ .Values.studio.image.repository | default "supabase/studio" }}:{{ .Values.studio.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.studio.image.pullPolicy }}
-          command: ["node", "server.js"]
-          workingDir: /app/apps/studio
+          command: ["studio"]
           env:
             {{- range $key, $value := .Values.studio.environment }}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-            {{- if .Values.kongOperator.enabled }}
-            - name: SUPABASE_URL
-              value: http://{{ .Values.kongOperator.serviceName }}.{{ .Values.kongOperator.serviceNamespace }}:{{ .Values.kongOperator.servicePort }}
+            {{- if .Values.db.enabled }}
+            - name: DATABASE_HOST
+              value: {{ include "supabase.db.fullname" . }}
             {{- end }}
-            {{- if .Values.meta.enabled }}
-            - name: STUDIO_PG_META_URL
-              value: http://{{ include "supabase.meta.fullname" . }}:{{ .Values.meta.service.port }}
-            {{- end }}
-            - name: SUPABASE_ANON_KEY
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "jwt" "field" "anonKey" "context" .) | nindent 18 }}
-            - name: SUPABASE_SERVICE_KEY
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "jwt" "field" "serviceKey" "context" .) | nindent 18 }}
-            {{- if .Values.analytics.enabled }}
-            - name: LOGFLARE_URL
-              value: http://{{ include "supabase.analytics.fullname" . }}:{{ .Values.analytics.service.port }}
-            - name: LOGFLARE_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "analytics" "field" "apiKey" "context" .) | nindent 18 }}
-            {{- end }}
-          {{- with .Values.studio.livenessProbe }}
-          livenessProbe:
-            {{- toYaml . | nindent 12 }}
+          {{- if and .Values.global.csi .Values.global.csi.enabled }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.csi.secretName | default "" }}
+          {{- else if .Values.global.defaultSecretName }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.defaultSecretName }}
+          {{- else }}
+          envFrom:
+            - secretRef:
+                name: {{ include "supabase.secretName" . }}
           {{- end }}
-          {{- with .Values.studio.readinessProbe }}
-          readinessProbe:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+          {{- include "supabase.component.healthChecks" (dict "Values" .Values "component" "studio" "context" .) | nindent 10 }}
           ports:
             - name: http
               containerPort: 3000
               protocol: TCP
-          {{- with .Values.studio.resources }}
-          resources:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+          {{- include "supabase.component.resources" (dict "Values" .Values "component" "studio" "context" .) | nindent 10 }}
           {{- with .Values.studio.volumeMounts }}
           volumeMounts:
             {{- toYaml . | nindent 12 }}
@@ -89,16 +72,5 @@ spec:
       volumes:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.studio.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.studio.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.studio.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "supabase.component.scheduling" (dict "Values" .Values "component" "studio" "context" .) | nindent 6 }}
 {{- end }}

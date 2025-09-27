@@ -1,0 +1,67 @@
+{{- if and .Values.functions.enabled (and .Values.functions .Values.functions.kong) .Values.functions.kong.enabled }}
+apiVersion: configuration.konghq.com/v1
+kind: KongService
+metadata:
+  name: {{ include "supabase.functions.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  host: {{ include "supabase.functions.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+  port: {{ .Values.functions.service.port }}
+  protocol: http
+  {{- with .Values.functions.kong.path }}
+  path: {{ .Values }}
+  {{- end }}
+  {{- with .Values.functions.kong.retries }}
+  retries: {{ .Values }}
+  {{- end }}
+  {{- with .Values.functions.kong.connectTimeout }}
+  connect_timeout: {{ .Values }}
+  {{- end }}
+  {{- with .Values.functions.kong.writeTimeout }}
+  write_timeout: {{ .Values }}
+  {{- end }}
+  {{- with .Values.functions.kong.readTimeout }}
+  read_timeout: {{ .Values }}
+  {{- end }}
+---
+{{- if .Values.functions.kong.route.enabled }}
+apiVersion: configuration.konghq.com/v1
+kind: KongRoute
+metadata:
+  name: {{ include "supabase.functions.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  service:
+    name: {{ include "supabase.functions.fullname" . }}
+  paths:
+    {{- toYaml .Values.functions.kong.route.paths | nindent 4 }}
+  strip_path: {{ .Values.functions.kong.route.stripPath }}
+  {{- with .Values.functions.kong.route.methods }}
+  methods:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.functions.kong.route.protocols }}
+  protocols:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+---
+{{- if .Values.functions.kong.plugins }}
+{{- range $plugin := .Values.functions.kong.plugins }}
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: {{ include "supabase.functions.fullname" $ }}-{{ $plugin.name }}
+  labels:
+    {{- include "supabase.labels" $ | nindent 4 }}
+plugin: {{ $plugin.name }}
+{{- with $plugin.config }}
+config:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+---
+{{- end }}
+{{- end }}
+{{- end }}

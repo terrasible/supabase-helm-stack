@@ -6,7 +6,7 @@ metadata:
   labels:
     {{- include "supabase.labels" . | nindent 4 }}
 spec:
-  {{- if not .Values.storage.autoscaling.enabled }}
+  {{- if not (and .Values.storage.autoscaling .Values.storage.autoscaling.enabled) }}
   replicas: {{ .Values.storage.replicaCount }}
   {{- end }}
   selector:
@@ -21,7 +21,6 @@ spec:
       labels:
         {{- include "supabase.storage.selectorLabels" . | nindent 8 }}
     spec:
-      restartPolicy: Always
       {{- with .Values.storage.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -54,37 +53,13 @@ spec:
               sleep 2
               done
             - echo "Database is ready"
-        {{- if .Values.minio.enabled }}
-        - env:
-            - name: MINIO_ROOT_USER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "supabase.secret.s3" . }}
-                  key: keyId
-            - name: MINIO_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "supabase.secret.s3" . }}
-                  key: accessKey
-          name: init-bucket
-          image: minio/mc
-          imagePullPolicy: IfNotPresent
-          command:
-            - /bin/sh
-            - -c
-            - |
-              until /usr/bin/mc alias set supa-minio http://{{ include "supabase.minio.fullname" . }}:{{ .Values.minio.service.port }} $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD; do
-                echo "Waiting for minio to start..."
-                sleep 2
-              done
-              /usr/bin/mc mb --ignore-existing supa-minio/stub
-        {{- end }}
       containers:
         - name: {{ include "supabase.storage.name" $ }}
           securityContext:
             {{- toYaml .Values.storage.securityContext | nindent 12 }}
           image: "{{ .Values.storage.image.repository }}:{{ .Values.storage.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.storage.image.pullPolicy }}
+          command: ["storage"]
           env:
             {{- range $key, $value := .Values.storage.environment }}
             - name: {{ $key }}
@@ -94,54 +69,21 @@ spec:
             - name: DB_HOST
               value: {{ include "supabase.db.fullname" . }}
             {{- end }}
-            {{- if .Values.rest.enabled }}
-            - name: POSTGREST_URL
-              value: http://{{ include "supabase.rest.fullname" . }}:{{ .Values.rest.service.port }}
-            {{- end }}
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "db" "field" "password" "context" .) | nindent 18 }}
-            - name: DB_PASSWORD_ENC
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "db" "field" "password_encoded" "context" .) | nindent 18 }}
-            - name: DB_NAME
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "db" "field" "database" "context" .) | nindent 18 }}
-            - name: DATABASE_URL
-              value: $(DB_DRIVER)://$(DB_USER):$(DB_PASSWORD_ENC)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?search_path=auth&sslmode=$(DB_SSL)
-            - name: PGRST_JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "jwt" "field" "secret" "context" .) | nindent 18 }}
-            - name: ANON_KEY
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "jwt" "field" "anonKey" "context" .) | nindent 18 }}
-            - name: SERVICE_KEY
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "jwt" "field" "serviceKey" "context" .) | nindent 18 }}
-            {{- if .Values.imgproxy.enabled }}
-            - name: IMGPROXY_URL
-              value: http://{{ include "supabase.imgproxy.fullname" . }}:{{ .Values.imgproxy.service.port | int }}
-            {{- end }}
-            {{- if eq (include "supabase.secret.s3.isValid" .) "true" }}
-            - name: AWS_ACCESS_KEY_ID
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "s3" "field" "keyId" "context" .) | nindent 18 }}
-            - name: AWS_SECRET_ACCESS_KEY
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "s3" "field" "accessKey" "context" .) | nindent 18 }}
-            {{- end }}
-            {{- if .Values.minio.enabled }}
-            - name: GLOBAL_S3_ENDPOINT
-              value: http://{{ include "supabase.minio.fullname" . }}:{{ default 9000 .Values.minio.service.port }}
-            {{- end }}
+          {{- if and .Values.global.csi .Values.global.csi.enabled }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.csi.secretName | default "" }}
+          {{- else if .Values.global.defaultSecretName }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.defaultSecretName }}
+
+          {{- else }}
+          envFrom:
+            - secretRef:
+                name: {{ include "supabase.secretName" . }}
+
+          {{- end }}
           {{- with .Values.storage.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
@@ -158,12 +100,14 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          volumeMounts:
           {{- with .Values.storage.volumeMounts }}
+          volumeMounts:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-            - mountPath: /var/lib/storage
-              name: storage-data
+      {{- with .Values.storage.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.storage.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -176,16 +120,4 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      volumes:
-        - name: storage-data
-          {{- if .Values.storage.persistence.enabled }}
-          persistentVolumeClaim:
-            claimName: {{ include "supabase.storage.fullname" . }}-pvc
-          {{- else }}
-          emptyDir:
-            medium: ""
-          {{- end }}
-        {{- with .Values.storage.volumes }}
-          {{- toYaml . | nindent 8 }}
-        {{- end }}
 {{- end }}

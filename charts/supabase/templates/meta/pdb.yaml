@@ -1,0 +1,24 @@
+{{- if and .Values.meta.enabled (and .Values.meta .Values.meta.podDisruptionBudget) .Values.meta.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "supabase.fullname" . }}-meta
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: meta
+  {{- with .Values.meta.podDisruptionBudget.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.meta.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.meta.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.meta.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.meta.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "supabase.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: meta
+{{- end }}

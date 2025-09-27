@@ -1,0 +1,67 @@
+{{- if and .Values.meta.enabled (and .Values.meta .Values.meta.kong) .Values.meta.kong.enabled }}
+apiVersion: configuration.konghq.com/v1
+kind: KongService
+metadata:
+  name: {{ include "supabase.meta.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  host: {{ include "supabase.meta.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+  port: {{ .Values.meta.service.port }}
+  protocol: http
+  {{- with .Values.meta.kong.path }}
+  path: {{ .Values }}
+  {{- end }}
+  {{- with .Values.meta.kong.retries }}
+  retries: {{ .Values }}
+  {{- end }}
+  {{- with .Values.meta.kong.connectTimeout }}
+  connect_timeout: {{ .Values }}
+  {{- end }}
+  {{- with .Values.meta.kong.writeTimeout }}
+  write_timeout: {{ .Values }}
+  {{- end }}
+  {{- with .Values.meta.kong.readTimeout }}
+  read_timeout: {{ .Values }}
+  {{- end }}
+---
+{{- if .Values.meta.kong.route.enabled }}
+apiVersion: configuration.konghq.com/v1
+kind: KongRoute
+metadata:
+  name: {{ include "supabase.meta.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  service:
+    name: {{ include "supabase.meta.fullname" . }}
+  paths:
+    {{- toYaml .Values.meta.kong.route.paths | nindent 4 }}
+  strip_path: {{ .Values.meta.kong.route.stripPath }}
+  {{- with .Values.meta.kong.route.methods }}
+  methods:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.meta.kong.route.protocols }}
+  protocols:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+---
+{{- if .Values.meta.kong.plugins }}
+{{- range $plugin := .Values.meta.kong.plugins }}
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: {{ include "supabase.meta.fullname" $ }}-{{ $plugin.name }}
+  labels:
+    {{- include "supabase.labels" $ | nindent 4 }}
+plugin: {{ $plugin.name }}
+{{- with $plugin.config }}
+config:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+---
+{{- end }}
+{{- end }}
+{{- end }}

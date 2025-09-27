@@ -1,168 +1,32 @@
-{{- if and .Values.studio.enabled .Values.networkPolicy.enabled }}
+{{- if and .Values.studio.enabled (and .Values.studio .Values.studio.networkPolicy) .Values.studio.networkPolicy.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "supabase.fullname" . }}-studio
+  name: {{ include "supabase.studio.fullname" . }}
   labels:
-    {{- include "supabase.labels" . | nindent 4 }}
-    app.kubernetes.io/component: studio
-  {{- with .Values.networkPolicy.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- include "supabase.studio.labels" . | nindent 4 }}
 spec:
   podSelector:
     matchLabels:
-      {{- include "supabase.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: studio
+      {{- include "supabase.studio.selectorLabels" . | nindent 6 }}
   policyTypes:
-    - Ingress
-    - Egress
+  - Ingress
+  - Egress
   ingress:
-    # Allow traffic from Kong Gateway (via Kong Operator)
-    {{- if .Values.kongOperator.enabled }}
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              name: {{ .Values.kongOperator.serviceNamespace }}
-        - podSelector:
-            matchLabels:
-              app: kong
-    {{- end }}
-      ports:
-        - protocol: TCP
-          port: 3000
-    # Allow traffic from ingress controllers
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              name: ingress-nginx
-        - namespaceSelector:
-            matchLabels:
-              name: istio-system
-        - namespaceSelector:
-            matchLabels:
-              name: traefik
-      ports:
-        - protocol: TCP
-          port: 3000
-    {{- if .Values.studio.serviceMonitor.enabled }}
-    # Allow Prometheus to scrape metrics
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              name: monitoring
-        - namespaceSelector:
-            matchLabels:
-              name: prometheus
-        - podSelector:
-            matchLabels:
-              app: prometheus
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: prometheus
-      ports:
-        - protocol: TCP
-          port: {{ .Values.studio.serviceMonitor.port | default "metrics" }}
-    {{- end }}
-    {{- with .Values.networkPolicy.studio.additionalIngress }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: {{ .Release.Namespace }}
+    - podSelector:
+        matchLabels:
+          {{- include "supabase.labels" . | nindent 10 }}
+    ports:
+    - protocol: TCP
+      port: {{ .Values.studio.service.port }}
   egress:
-    # Allow DNS resolution
-    - to: []
-      ports:
-        - protocol: UDP
-          port: 53
-        - protocol: TCP
-          port: 53
-    # Allow access to database
-    - to:
-        - podSelector:
-            matchLabels:
-              {{- include "supabase.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: db
-      ports:
-        - protocol: TCP
-          port: 5432
-    {{- if .Values.externalDatabase.enabled }}
-    # Allow access to external database
-    - to: []
-      ports:
-        - protocol: TCP
-          port: {{ .Values.externalDatabase.port | default 5432 }}
-    {{- end }}
-    # Allow access to Meta service
-    - to:
-        - podSelector:
-            matchLabels:
-              {{- include "supabase.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: meta
-      ports:
-        - protocol: TCP
-          port: 8080
-    # Allow access to Auth service
-    - to:
-        - podSelector:
-            matchLabels:
-              {{- include "supabase.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: auth
-      ports:
-        - protocol: TCP
-          port: 9999
-    # Allow access to Storage service
-    - to:
-        - podSelector:
-            matchLabels:
-              {{- include "supabase.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: storage
-      ports:
-        - protocol: TCP
-          port: 5000
-    # Allow access to Realtime service
-    - to:
-        - podSelector:
-            matchLabels:
-              {{- include "supabase.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: realtime
-      ports:
-        - protocol: TCP
-          port: 4000
-    # Allow access to REST API service
-    - to:
-        - podSelector:
-            matchLabels:
-              {{- include "supabase.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: rest
-      ports:
-        - protocol: TCP
-          port: 3000
-    # Allow access to Kong Gateway (via Kong Operator)
-    {{- if .Values.kongOperator.enabled }}
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              name: {{ .Values.kongOperator.serviceNamespace }}
-        - podSelector:
-            matchLabels:
-              app: kong
-      ports:
-        - protocol: TCP
-          port: {{ .Values.kongOperator.servicePort }}
-        - protocol: TCP
-          port: {{ .Values.kongOperator.adminApi.servicePort }}
-    {{- end }}
-    # Allow HTTPS traffic for external APIs
-    - to: []
-      ports:
-        - protocol: TCP
-          port: 443
-    # Allow HTTP traffic for external APIs
-    - to: []
-      ports:
-        - protocol: TCP
-          port: 80
-    {{- with .Values.networkPolicy.studio.additionalEgress }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}
+  - to: []
+    ports: []
+  {{- with .Values.studio.networkPolicy.egressRules }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
 {{- end }}

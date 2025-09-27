@@ -22,6 +22,30 @@ A production-ready Helm chart for deploying [Supabase](https://supabase.com/) on
 - PV provisioner support in the underlying infrastructure
 - Ingress controller (optional, for external access)
 
+### Required: Kong Operator Installation
+
+**⚠️ IMPORTANT**: Before installing this chart, you must install the Kong Operator which provides the necessary Custom Resource Definitions (CRDs):
+
+```bash
+# Install Kong Operator
+kubectl apply -f https://github.com/Kong/kubernetes-ingress-controller/releases/latest/download/all-in-one-dbless.yaml
+
+# Verify Kong Operator is running
+kubectl get pods -n kong-system
+
+# Wait for Kong Operator to be ready
+kubectl wait --for=condition=ready pod -l app=ingress-kong -n kong-system --timeout=300s
+```
+
+### Chart Dependencies
+
+This chart includes dependencies that need to be downloaded before installation:
+
+```bash
+# Update chart dependencies (required before first install)
+helm dependency update ./charts/supabase
+```
+
 ## 🛠️ Installation
 
 ### Quick Start
@@ -41,6 +65,9 @@ helm install my-supabase supabase-helm/supabase
 # Clone the repository
 git clone https://github.com/your-username/supabase-helm-stack.git
 cd supabase-helm-stack
+
+# Update chart dependencies (required)
+helm dependency update ./charts/supabase
 
 # Install with custom values
 helm install my-supabase ./charts/supabase -f my-values.yaml

@@ -1,0 +1,24 @@
+{{- if and .Values.imgproxy.enabled (and .Values.imgproxy .Values.imgproxy.podDisruptionBudget) .Values.imgproxy.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "supabase.fullname" . }}-imgproxy
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: imgproxy
+  {{- with .Values.imgproxy.podDisruptionBudget.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.imgproxy.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.imgproxy.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.imgproxy.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.imgproxy.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "supabase.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: imgproxy
+{{- end }}

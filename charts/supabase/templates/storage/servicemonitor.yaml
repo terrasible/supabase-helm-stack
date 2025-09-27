@@ -1,94 +1,27 @@
-{{- if and .Values.storage.enabled .Values.storage.serviceMonitor.enabled }}
+{{- if and .Values.storage.enabled (and .Values.storage.monitoring (and .Values.storage .Values.storage.monitoring) .Values.storage.monitoring.enabled) }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "supabase.fullname" . }}-storage
+  name: {{ include "supabase.storage.fullname" . }}
   labels:
     {{- include "supabase.labels" . | nindent 4 }}
-    app.kubernetes.io/component: storage
-    {{- with .Values.storage.serviceMonitor.additionalLabels }}
+    {{- with and .Values.storage.monitoring.serviceMonitor .Values.storage.monitoring.serviceMonitor.additionalLabels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
-  {{- with .Values.storage.serviceMonitor.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
 spec:
-  {{- if .Values.storage.serviceMonitor.jobLabel }}
-  jobLabel: {{ .Values.storage.serviceMonitor.jobLabel }}
-  {{- end }}
   selector:
     matchLabels:
-      {{- include "supabase.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: storage
-      {{- with .Values.storage.serviceMonitor.selector }}
-      {{- toYaml . | nindent 6 }}
-      {{- end }}
+      {{- include "supabase.storage.selectorLabels" . | nindent 6 }}
   endpoints:
-    - port: {{ .Values.storage.serviceMonitor.port | default "metrics" }}
-      {{- if .Values.storage.serviceMonitor.interval }}
-      interval: {{ .Values.storage.serviceMonitor.interval }}
-      {{- end }}
-      {{- if .Values.storage.serviceMonitor.scrapeTimeout }}
-      scrapeTimeout: {{ .Values.storage.serviceMonitor.scrapeTimeout }}
-      {{- end }}
-      path: {{ .Values.storage.serviceMonitor.path | default "/metrics" }}
-      {{- if .Values.storage.serviceMonitor.scheme }}
-      scheme: {{ .Values.storage.serviceMonitor.scheme }}
-      {{- end }}
-      {{- if .Values.storage.serviceMonitor.tlsConfig }}
-      tlsConfig:
-        {{- toYaml .Values.storage.serviceMonitor.tlsConfig | nindent 8 }}
-      {{- end }}
-      {{- if .Values.storage.serviceMonitor.bearerTokenFile }}
-      bearerTokenFile: {{ .Values.storage.serviceMonitor.bearerTokenFile }}
-      {{- end }}
-      {{- if .Values.storage.serviceMonitor.bearerTokenSecret }}
-      bearerTokenSecret:
-        {{- toYaml .Values.storage.serviceMonitor.bearerTokenSecret | nindent 8 }}
-      {{- end }}
-      {{- if .Values.storage.serviceMonitor.basicAuth }}
-      basicAuth:
-        {{- toYaml .Values.storage.serviceMonitor.basicAuth | nindent 8 }}
-      {{- end }}
-      {{- if .Values.storage.serviceMonitor.metricRelabelings }}
-      metricRelabelings:
-        {{- toYaml .Values.storage.serviceMonitor.metricRelabelings | nindent 8 }}
-      {{- end }}
-      {{- if .Values.storage.serviceMonitor.relabelings }}
-      relabelings:
-        {{- toYaml .Values.storage.serviceMonitor.relabelings | nindent 8 }}
-      {{- end }}
-      {{- if .Values.storage.serviceMonitor.proxyUrl }}
-      proxyUrl: {{ .Values.storage.serviceMonitor.proxyUrl }}
-      {{- end }}
-      {{- if .Values.storage.serviceMonitor.honorLabels }}
-      honorLabels: {{ .Values.storage.serviceMonitor.honorLabels }}
-      {{- end }}
-      {{- if .Values.storage.serviceMonitor.honorTimestamps }}
-      honorTimestamps: {{ .Values.storage.serviceMonitor.honorTimestamps }}
-      {{- end }}
-  {{- if .Values.storage.serviceMonitor.targetLabels }}
-  targetLabels:
-    {{- toYaml .Values.storage.serviceMonitor.targetLabels | nindent 4 }}
-  {{- end }}
-  {{- if .Values.storage.serviceMonitor.podTargetLabels }}
-  podTargetLabels:
-    {{- toYaml .Values.storage.serviceMonitor.podTargetLabels | nindent 4 }}
-  {{- end }}
-  {{- if .Values.storage.serviceMonitor.sampleLimit }}
-  sampleLimit: {{ .Values.storage.serviceMonitor.sampleLimit }}
-  {{- end }}
-  {{- if .Values.storage.serviceMonitor.targetLimit }}
-  targetLimit: {{ .Values.storage.serviceMonitor.targetLimit }}
-  {{- end }}
-  {{- if .Values.storage.serviceMonitor.labelLimit }}
-  labelLimit: {{ .Values.storage.serviceMonitor.labelLimit }}
-  {{- end }}
-  {{- if .Values.storage.serviceMonitor.labelNameLengthLimit }}
-  labelNameLengthLimit: {{ .Values.storage.serviceMonitor.labelNameLengthLimit }}
-  {{- end }}
-  {{- if .Values.storage.serviceMonitor.labelValueLengthLimit }}
-  labelValueLengthLimit: {{ .Values.storage.serviceMonitor.labelValueLengthLimit }}
-  {{- end }}
+  - port: http
+    interval: {{ .Values.storage.monitoring.serviceMonitor.interval | default "30s" }}
+    path: {{ .Values.storage.monitoring.serviceMonitor.path | default "/metrics" }}
+    {{- with and .Values.storage.monitoring.serviceMonitor .Values.storage.monitoring.serviceMonitor.metricRelabelings }}
+    metricRelabelings:
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with and .Values.storage.monitoring.serviceMonitor .Values.storage.monitoring.serviceMonitor.relabelings }}
+    relabelings:
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
 {{- end }}

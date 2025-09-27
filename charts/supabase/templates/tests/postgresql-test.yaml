@@ -27,7 +27,7 @@ spec:
           fi
       env:
         - name: POSTGRES_PASSWORD
-      valueFrom:
-        secretKeyRef:
-          name: {{ .Release.Name }}-postgresql
-          key: postgres-password
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-postgresql
+              key: postgres-password

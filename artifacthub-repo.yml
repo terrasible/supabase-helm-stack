@@ -1,0 +1,50 @@
+# Artifact Hub repository metadata file
+# https://artifacthub.io/docs/topics/repositories/
+
+repositoryID: supabase-helm-stack
+owners:
+  - name: Bibek Rauniyar
+    email: bibek@example.com
+
+# Repository display name
+displayName: Supabase Helm Stack
+
+# Repository description
+description: |
+  Production-ready Helm chart for deploying Supabase on Kubernetes with enterprise features including Kong Operator integration, comprehensive monitoring, and security best practices.
+
+# Repository URL
+url: https://github.com/your-org/supabase-helm-stack
+
+# Repository branch (optional, defaults to main)
+branch: main
+
+# Ignore patterns for files that should not be processed
+ignore:
+  - "*.md"
+  - "docs/*"
+  - "examples/*"
+  - ".github/*"
+
+# Repository verification
+verified: false
+
+# Official repository
+official: false
+
+# Scanner disabled (optional)
+scannerDisabled: false
+
+# Repository data
+data:
+  # Repository logo URL (optional)
+  logoURL: https://avatars.githubusercontent.com/u/54469796?s=280&v=4
+
+  # Repository links
+  links:
+    - name: Source Code
+      url: https://github.com/your-org/supabase-helm-stack
+    - name: Supabase Official
+      url: https://supabase.com
+    - name: Documentation
+      url: https://supabase.com/docs

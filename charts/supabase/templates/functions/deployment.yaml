@@ -6,7 +6,7 @@ metadata:
   labels:
     {{- include "supabase.labels" . | nindent 4 }}
 spec:
-  {{- if not .Values.functions.autoscaling.enabled }}
+  {{- if not (and .Values.functions.autoscaling .Values.functions.autoscaling.enabled) }}
   replicas: {{ .Values.functions.replicaCount }}
   {{- end }}
   selector:
@@ -28,53 +28,62 @@ spec:
       serviceAccountName: {{ include "supabase.functions.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.functions.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: init-db
+          image: postgres:15-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DB_HOST
+              {{- if .Values.db.enabled }}
+              value: {{ include "supabase.db.fullname" . | quote }}
+              {{- else }}
+              value: {{ .Values.auth.environment.DB_HOST | quote }}
+              {{- end }}
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "db" "field" "username" "context" .) | nindent 18 }}
+            - name: DB_PORT
+              value: "{{ .Values.functions.environment.DB_PORT }}"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER"; do
+              echo "Waiting for database to start..."
+              sleep 2
+              done
+            - echo "Database is ready"
       containers:
-        - args:
-            - start
-            - --main-service
-            - /home/deno/functions/main
-          name: {{ include "supabase.functions.name" $ }}
+        - name: {{ include "supabase.functions.name" $ }}
           securityContext:
             {{- toYaml .Values.functions.securityContext | nindent 12 }}
           image: "{{ .Values.functions.image.repository }}:{{ .Values.functions.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.functions.image.pullPolicy }}
+          command: ["edge-runtime"]
           env:
             {{- range $key, $value := .Values.functions.environment }}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-            - name: DB_HOSTNAME
-              {{- if .Values.db.enabled }}
+            {{- if .Values.db.enabled }}
+            - name: DB_HOST
               value: {{ include "supabase.db.fullname" . }}
-              {{- else }}
-              value: $(DB_HOST)
-              {{- end }}
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "db" "field" "password" "context" .) | nindent 18 }}
-            - name: DB_PASSWORD_ENC
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "db" "field" "password_encoded" "context" .) | nindent 18 }}
-            - name: DB_DATABASE
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "db" "field" "database" "context" .) | nindent 18 }}
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "jwt" "field" "secret" "context" .) | nindent 18 }}
-            - name: SUPABASE_ANON_KEY
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "jwt" "field" "anonKey" "context" .) | nindent 18 }}
-            - name: SUPABASE_SERVICE_ROLE_KEY
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "jwt" "field" "serviceKey" "context" .) | nindent 18 }}
-            - name: POSTGRES_BACKEND_URL
-              value: $(DB_DRIVER)://$(DB_USERNAME):$(DB_PASSWORD_ENC)@$(DB_HOSTNAME):$(DB_PORT)/$(DB_DATABASE)?search_path=auth&sslmode=$(DB_SSL)
+            {{- end }}
+          {{- if and .Values.global.csi .Values.global.csi.enabled }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.csi.secretName | default "" }}
+          {{- else if .Values.global.defaultSecretName }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.defaultSecretName }}
+
+          {{- else }}
+          envFrom:
+            - secretRef:
+                name: {{ include "supabase.secretName" . }}
+
+          {{- end }}
           {{- with .Values.functions.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
@@ -83,23 +92,22 @@ spec:
           readinessProbe:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          volumeMounts:
-            {{- with .Values.functions.volumeMounts }}
-              {{- toYaml . | nindent 12 }}
-            {{- end }}
-            - mountPath: /home/deno/functions/main
-              name: functions-main
+          ports:
+            - name: http
+              containerPort: 9000
+              protocol: TCP
           {{- with .Values.functions.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- with .Values.functions.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.functions.volumes }}
       volumes:
-        {{- with .Values.functions.volumes }}
-          {{- toYaml . | nindent 8 }}
-        {{- end }}
-        - name: functions-main
-          configMap:
-            name: {{ include "supabase.functions.fullname" . }}-main
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.functions.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

@@ -1,0 +1,16 @@
+{{- if and .Values.rest.enabled (and .Values.rest.rbac (and .Values.rest.rbac .Values.rest.rbac.create) .Values.rest.rbac.create) }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "supabase.rest.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "supabase.rest.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "supabase.rest.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

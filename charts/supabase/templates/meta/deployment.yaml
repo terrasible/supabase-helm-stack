@@ -6,7 +6,7 @@ metadata:
   labels:
     {{- include "supabase.labels" . | nindent 4 }}
 spec:
-  {{- if not .Values.meta.autoscaling.enabled }}
+  {{- if not (and .Values.meta.autoscaling .Values.meta.autoscaling.enabled) }}
   replicas: {{ .Values.meta.replicaCount }}
   {{- end }}
   selector:
@@ -28,12 +28,38 @@ spec:
       serviceAccountName: {{ include "supabase.meta.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.meta.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: init-db
+          image: postgres:15-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DB_HOST
+              {{- if .Values.db.enabled }}
+              value: {{ include "supabase.db.fullname" . | quote }}
+              {{- else }}
+              value: {{ .Values.auth.environment.DB_HOST | quote }}
+              {{- end }}
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "db" "field" "username" "context" .) | nindent 18 }}
+            - name: DB_PORT
+              value: "{{ .Values.meta.environment.DB_PORT }}"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER"; do
+              echo "Waiting for database to start..."
+              sleep 2
+              done
+            - echo "Database is ready"
       containers:
         - name: {{ include "supabase.meta.name" $ }}
           securityContext:
             {{- toYaml .Values.meta.securityContext | nindent 12 }}
           image: "{{ .Values.meta.image.repository }}:{{ .Values.meta.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.meta.image.pullPolicy }}
+          command: ["postgres-meta"]
           env:
             {{- range $key, $value := .Values.meta.environment }}
             - name: {{ $key }}
@@ -43,26 +69,21 @@ spec:
             - name: DB_HOST
               value: {{ include "supabase.db.fullname" . }}
             {{- end }}
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "db" "field" "password" "context" .) | nindent 18 }}
-            - name: DB_NAME
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "db" "field" "database" "context" .) | nindent 18 }}
-            - name: PG_META_DB_HOST
-              value: $(DB_HOST)
-            - name: PG_META_DB_PORT
-              value: $(DB_PORT)
-            - name: PG_META_DB_NAME
-              value: $(DB_NAME)
-            - name: PG_META_DB_USER
-              value: $(DB_USER)
-            - name: PG_META_DB_PASSWORD
-              value: $(DB_PASSWORD)
-            - name: PG_META_DB_SSL_MODE
-              value: $(DB_SSL)
+          {{- if and .Values.global.csi .Values.global.csi.enabled }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.csi.secretName | default "" }}
+          {{- else if .Values.global.defaultSecretName }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.defaultSecretName }}
+
+          {{- else }}
+          envFrom:
+            - secretRef:
+                name: {{ include "supabase.secretName" . }}
+
+          {{- end }}
           {{- with .Values.meta.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

@@ -1,0 +1,40 @@
+{{- if and .Values.realtime.enabled (and .Values.realtime.monitoring (and .Values.realtime .Values.realtime.monitoring) .Values.realtime.monitoring.enabled) (and .Values.realtime.monitoring.prometheusRules .Values.realtime.monitoring.prometheusRules.enabled) }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "supabase.realtime.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    {{- with .Values.realtime.monitoring.prometheusRules.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+  - name: realtime.rules
+    interval: {{ .Values.realtime.monitoring.prometheusRules.interval }}
+    rules:
+    - alert: RealtimeServiceDown
+      expr: up{job="{{ include "supabase.realtime.fullname" . }}"} == 0
+      for: {{ .Values.realtime.monitoring.prometheusRules.for }}
+      labels:
+        severity: critical
+      annotations:
+        summary: "Realtime service is down"
+        description: "Realtime service has been down for more than {{ .Values.realtime.monitoring.prometheusRules.for }}"
+    - alert: RealtimeHighMemoryUsage
+      expr: container_memory_usage_bytes{namespace="{{ .Release.Namespace }}", container="{{ include "supabase.realtime.name" . }}"} / container_spec_memory_limit_bytes{namespace="{{ .Release.Namespace }}", container="{{ include "supabase.realtime.name" . }}"} > 0.8
+      for: {{ .Values.realtime.monitoring.prometheusRules.for }}
+      labels:
+        severity: warning
+      annotations:
+        summary: "Realtime service high memory usage"
+        description: "Realtime service memory usage is above 80%"
+    - alert: RealtimeHighCPUUsage
+      expr: rate(container_cpu_usage_seconds_total{namespace="{{ .Release.Namespace }}", container="{{ include "supabase.realtime.name" . }}"}[5m]) / container_spec_cpu_quota{namespace="{{ .Release.Namespace }}", container="{{ include "supabase.realtime.name" . }}"} > 0.8
+      for: {{ .Values.realtime.monitoring.prometheusRules.for }}
+      labels:
+        severity: warning
+      annotations:
+        summary: "Realtime service high CPU usage"
+        description: "Realtime service CPU usage is above 80%"
+{{- end }}

@@ -1,138 +1,27 @@
-{{- if and .Values.meta.enabled .Values.meta.serviceMonitor.enabled }}
+{{- if and .Values.meta.enabled (and .Values.meta .Values.meta.monitoring) .Values.meta.monitoring.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "supabase.fullname" . }}-meta
+  name: {{ include "supabase.meta.fullname" . }}
   labels:
     {{- include "supabase.labels" . | nindent 4 }}
-    app.kubernetes.io/component: meta
-    {{- if .Values.meta.serviceMonitor.additionalLabels }}
-    {{- toYaml .Values.meta.serviceMonitor.additionalLabels | nindent 4 }}
-    {{- end }}
-  {{- with .Values.meta.serviceMonitor.annotations }}
-  annotations:
+    {{- with .Values.meta.monitoring.serviceMonitor.additionalLabels }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- end }}
 spec:
-  {{- if .Values.meta.serviceMonitor.jobLabel }}
-  jobLabel: {{ .Values.meta.serviceMonitor.jobLabel }}
-  {{- end }}
   selector:
     matchLabels:
-      {{- include "supabase.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: meta
-      {{- if .Values.meta.serviceMonitor.selector }}
-      {{- toYaml .Values.meta.serviceMonitor.selector | nindent 6 }}
-      {{- end }}
+      {{- include "supabase.meta.selectorLabels" . | nindent 6 }}
   endpoints:
-    - port: {{ .Values.meta.serviceMonitor.portName | default "metrics" }}
-      {{- if .Values.meta.serviceMonitor.interval }}
-      interval: {{ .Values.meta.serviceMonitor.interval }}
-      {{- end }}
-      {{- if .Values.meta.serviceMonitor.path }}
-      path: {{ .Values.meta.serviceMonitor.path }}
-      {{- end }}
-      {{- if .Values.meta.serviceMonitor.scheme }}
-      scheme: {{ .Values.meta.serviceMonitor.scheme }}
-      {{- end }}
-      {{- if .Values.meta.serviceMonitor.scrapeTimeout }}
-      scrapeTimeout: {{ .Values.meta.serviceMonitor.scrapeTimeout }}
-      {{- end }}
-      {{- if .Values.meta.serviceMonitor.honorLabels }}
-      honorLabels: {{ .Values.meta.serviceMonitor.honorLabels }}
-      {{- end }}
-      {{- if .Values.meta.serviceMonitor.honorTimestamps }}
-      honorTimestamps: {{ .Values.meta.serviceMonitor.honorTimestamps }}
-      {{- end }}
-      {{- if .Values.meta.serviceMonitor.basicAuth }}
-      basicAuth:
-        {{- if .Values.meta.serviceMonitor.basicAuth.username }}
-        username:
-          name: {{ .Values.meta.serviceMonitor.basicAuth.username.name }}
-          key: {{ .Values.meta.serviceMonitor.basicAuth.username.key }}
-        {{- end }}
-        {{- if .Values.meta.serviceMonitor.basicAuth.password }}
-        password:
-          name: {{ .Values.meta.serviceMonitor.basicAuth.password.name }}
-          key: {{ .Values.meta.serviceMonitor.basicAuth.password.key }}
-        {{- end }}
-      {{- end }}
-      {{- if .Values.meta.serviceMonitor.bearerTokenFile }}
-      bearerTokenFile: {{ .Values.meta.serviceMonitor.bearerTokenFile }}
-      {{- end }}
-      {{- if .Values.meta.serviceMonitor.bearerTokenSecret }}
-      bearerTokenSecret:
-        name: {{ .Values.meta.serviceMonitor.bearerTokenSecret.name }}
-        key: {{ .Values.meta.serviceMonitor.bearerTokenSecret.key }}
-      {{- end }}
-      {{- if .Values.meta.serviceMonitor.tlsConfig }}
-      tlsConfig:
-        {{- if .Values.meta.serviceMonitor.tlsConfig.ca }}
-        ca:
-          {{- if .Values.meta.serviceMonitor.tlsConfig.ca.secret }}
-          secret:
-            name: {{ .Values.meta.serviceMonitor.tlsConfig.ca.secret.name }}
-            key: {{ .Values.meta.serviceMonitor.tlsConfig.ca.secret.key }}
-          {{- end }}
-          {{- if .Values.meta.serviceMonitor.tlsConfig.ca.configMap }}
-          configMap:
-            name: {{ .Values.meta.serviceMonitor.tlsConfig.ca.configMap.name }}
-            key: {{ .Values.meta.serviceMonitor.tlsConfig.ca.configMap.key }}
-          {{- end }}
-        {{- end }}
-        {{- if .Values.meta.serviceMonitor.tlsConfig.cert }}
-        cert:
-          {{- if .Values.meta.serviceMonitor.tlsConfig.cert.secret }}
-          secret:
-            name: {{ .Values.meta.serviceMonitor.tlsConfig.cert.secret.name }}
-            key: {{ .Values.meta.serviceMonitor.tlsConfig.cert.secret.key }}
-          {{- end }}
-          {{- if .Values.meta.serviceMonitor.tlsConfig.cert.configMap }}
-          configMap:
-            name: {{ .Values.meta.serviceMonitor.tlsConfig.cert.configMap.name }}
-            key: {{ .Values.meta.serviceMonitor.tlsConfig.cert.configMap.key }}
-          {{- end }}
-        {{- end }}
-        {{- if .Values.meta.serviceMonitor.tlsConfig.keySecret }}
-        keySecret:
-          name: {{ .Values.meta.serviceMonitor.tlsConfig.keySecret.name }}
-          key: {{ .Values.meta.serviceMonitor.tlsConfig.keySecret.key }}
-        {{- end }}
-        {{- if .Values.meta.serviceMonitor.tlsConfig.serverName }}
-        serverName: {{ .Values.meta.serviceMonitor.tlsConfig.serverName }}
-        {{- end }}
-        {{- if .Values.meta.serviceMonitor.tlsConfig.insecureSkipVerify }}
-        insecureSkipVerify: {{ .Values.meta.serviceMonitor.tlsConfig.insecureSkipVerify }}
-        {{- end }}
-      {{- end }}
-      {{- if .Values.meta.serviceMonitor.proxyUrl }}
-      proxyUrl: {{ .Values.meta.serviceMonitor.proxyUrl }}
-      {{- end }}
-      {{- if .Values.meta.serviceMonitor.relabelings }}
-      relabelings:
-        {{- toYaml .Values.meta.serviceMonitor.relabelings | nindent 8 }}
-      {{- end }}
-      {{- if .Values.meta.serviceMonitor.metricRelabelings }}
-      metricRelabelings:
-        {{- toYaml .Values.meta.serviceMonitor.metricRelabelings | nindent 8 }}
-      {{- end }}
-  {{- if .Values.meta.serviceMonitor.namespaceSelector }}
-  namespaceSelector:
-    {{- toYaml .Values.meta.serviceMonitor.namespaceSelector | nindent 4 }}
-  {{- end }}
-  {{- if .Values.meta.serviceMonitor.sampleLimit }}
-  sampleLimit: {{ .Values.meta.serviceMonitor.sampleLimit }}
-  {{- end }}
-  {{- if .Values.meta.serviceMonitor.targetLimit }}
-  targetLimit: {{ .Values.meta.serviceMonitor.targetLimit }}
-  {{- end }}
-  {{- if .Values.meta.serviceMonitor.labelLimit }}
-  labelLimit: {{ .Values.meta.serviceMonitor.labelLimit }}
-  {{- end }}
-  {{- if .Values.meta.serviceMonitor.labelNameLengthLimit }}
-  labelNameLengthLimit: {{ .Values.meta.serviceMonitor.labelNameLengthLimit }}
-  {{- end }}
-  {{- if .Values.meta.serviceMonitor.labelValueLengthLimit }}
-  labelValueLengthLimit: {{ .Values.meta.serviceMonitor.labelValueLengthLimit }}
-  {{- end }}
+  - port: http
+    interval: {{ .Values.meta.monitoring.serviceMonitor.interval }}
+    path: {{ .Values.meta.monitoring.serviceMonitor.path }}
+    {{- with .Values.meta.monitoring.serviceMonitor.metricRelabelings }}
+    metricRelabelings:
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.meta.monitoring.serviceMonitor.relabelings }}
+    relabelings:
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
 {{- end }}

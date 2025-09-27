@@ -1,0 +1,89 @@
+{{- if and .Values.kong.enabled .Values.kongOperator.enabled }}
+# Supabase Auth Service
+apiVersion: configuration.konghq.com/v1
+kind: KongService
+metadata:
+  name: {{ include "supabase.fullname" . }}-auth
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  host: {{ include "supabase.auth.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+  port: {{ .Values.auth.service.port }}
+  protocol: http
+  path: /auth/v1
+  retries: 3
+  connect_timeout: 5000
+  write_timeout: 30000
+  read_timeout: 30000
+
+---
+# Supabase REST Service
+apiVersion: configuration.konghq.com/v1
+kind: KongService
+metadata:
+  name: {{ include "supabase.fullname" . }}-rest
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  host: {{ include "supabase.rest.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+  port: {{ .Values.rest.service.port }}
+  protocol: http
+  path: /rest/v1
+  retries: 3
+  connect_timeout: 5000
+  write_timeout: 30000
+  read_timeout: 30000
+
+---
+# Supabase Realtime Service
+apiVersion: configuration.konghq.com/v1
+kind: KongService
+metadata:
+  name: {{ include "supabase.fullname" . }}-realtime
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  host: {{ include "supabase.realtime.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+  port: {{ .Values.realtime.service.port }}
+  protocol: http
+  path: /realtime/v1
+  retries: 3
+  connect_timeout: 5000
+  write_timeout: 30000
+  read_timeout: 30000
+
+---
+# Supabase Storage Service
+apiVersion: configuration.konghq.com/v1
+kind: KongService
+metadata:
+  name: {{ include "supabase.fullname" . }}-storage
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  host: {{ include "supabase.storage.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+  port: {{ .Values.storage.service.port }}
+  protocol: http
+  path: /storage/v1
+  retries: 3
+  connect_timeout: 5000
+  write_timeout: 30000
+  read_timeout: 30000
+
+---
+# Supabase Studio Service (External)
+apiVersion: configuration.konghq.com/v1
+kind: KongService
+metadata:
+  name: {{ include "supabase.fullname" . }}-studio
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  host: {{ include "supabase.studio.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+  port: {{ .Values.studio.service.port }}
+  protocol: http
+  retries: 3
+  connect_timeout: 5000
+  write_timeout: 30000
+  read_timeout: 30000
+{{- end }}

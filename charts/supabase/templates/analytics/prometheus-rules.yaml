@@ -1,0 +1,16 @@
+{{- if and .Values.analytics.enabled (and .Values.analytics .Values.analytics.monitoring) .Values.analytics.monitoring.enabled .Values.analytics.monitoring.prometheusRules.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "supabase.analytics.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    {{- with .Values.analytics.monitoring.prometheusRules.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: {{ include "supabase.analytics.fullname" . }}
+      rules:
+        {{- toYaml .Values.analytics.monitoring.prometheusRules.rules | nindent 8 }}
+{{- end }}

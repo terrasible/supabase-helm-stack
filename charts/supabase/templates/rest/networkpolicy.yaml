@@ -1,74 +1,23 @@
-{{- if and .Values.rest.enabled .Values.networkPolicy.enabled }}
+{{- if and .Values.rest.enabled (and .Values.rest.networkPolicy (and .Values.rest .Values.rest.networkPolicy) .Values.rest.networkPolicy.enabled) }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "supabase.fullname" . }}-rest
+  name: {{ include "supabase.rest.fullname" . }}
   labels:
     {{- include "supabase.labels" . | nindent 4 }}
-    app.kubernetes.io/component: rest
-  {{- with .Values.networkPolicy.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
 spec:
   podSelector:
     matchLabels:
-      {{- include "supabase.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: rest
+      {{- include "supabase.rest.selectorLabels" . | nindent 6 }}
   policyTypes:
     - Ingress
     - Egress
+  {{- with .Values.rest.networkPolicy.ingress }}
   ingress:
-    # Allow ingress from Kong Gateway (via Kong Operator)
-    {{- if .Values.kongOperator.enabled }}
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              name: {{ .Values.kongOperator.serviceNamespace }}
-        - podSelector:
-            matchLabels:
-              app: kong
-    {{- end }}
-      ports:
-        - protocol: TCP
-          port: {{ .Values.rest.service.targetPort | default 3000 }}
-    # Allow metrics scraping from Prometheus
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              name: {{ .Values.prometheus.namespace | default "monitoring" }}
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: prometheus
-      ports:
-        - protocol: TCP
-          port: {{ .Values.rest.service.targetPort | default 3000 }}
-    {{- if .Values.rest.networkPolicy.additionalIngress }}
-    {{- toYaml .Values.rest.networkPolicy.additionalIngress | nindent 4 }}
-    {{- end }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.rest.networkPolicy.egress }}
   egress:
-    # Allow egress to database
-    - to:
-        - podSelector:
-            matchLabels:
-              {{- include "supabase.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: db
-      ports:
-        - protocol: TCP
-          port: 5432
-    # Allow DNS resolution
-    - to: []
-      ports:
-        - protocol: UDP
-          port: 53
-        - protocol: TCP
-          port: 53
-    # Allow HTTPS for external services
-    - to: []
-      ports:
-        - protocol: TCP
-          port: 443
-    {{- if .Values.rest.networkPolicy.additionalEgress }}
-    {{- toYaml .Values.rest.networkPolicy.additionalEgress | nindent 4 }}
-    {{- end }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 {{- end }}

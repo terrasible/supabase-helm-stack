@@ -6,7 +6,7 @@ metadata:
   labels:
     {{- include "supabase.labels" . | nindent 4 }}
 spec:
-  {{- if not .Values.realtime.autoscaling.enabled }}
+  {{- if not (and .Values.realtime.autoscaling .Values.realtime.autoscaling.enabled) }}
   replicas: {{ .Values.realtime.replicaCount }}
   {{- end }}
   selector:
@@ -70,22 +70,21 @@ spec:
             - name: DB_HOST
               value: {{ include "supabase.db.fullname" . }}
             {{- end }}
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "db" "field" "password" "context" .) | nindent 18 }}
-            - name: DB_NAME
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "db" "field" "database" "context" .) | nindent 18 }}
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "jwt" "field" "secret" "context" .) | nindent 18 }}
-            - name: API_JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "jwt" "field" "secret" "context" .) | nindent 18 }}
+          {{- if and .Values.global.csi .Values.global.csi.enabled }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.csi.secretName | default "" }}
+          {{- else if .Values.global.defaultSecretName }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.defaultSecretName }}
+
+          {{- else }}
+          envFrom:
+            - secretRef:
+                name: {{ include "supabase.secretName" . }}
+
+          {{- end }}
           {{- with .Values.realtime.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

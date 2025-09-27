@@ -1,0 +1,10 @@
+{{- if and .Values.imgproxy.enabled (and .Values.imgproxy.rbac .Values.imgproxy.rbac.create) .Values.imgproxy.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "supabase.imgproxy.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+rules:
+  {{- toYaml .Values.imgproxy.rbac.rules | nindent 2 }}
+{{- end }}

@@ -1,70 +1,27 @@
-{{- if and .Values.rest.enabled .Values.rest.serviceMonitor.enabled }}
+{{- if and .Values.rest.enabled (and .Values.rest.monitoring (and .Values.rest .Values.rest.monitoring) .Values.rest.monitoring.enabled) }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "supabase.fullname" . }}-rest
+  name: {{ include "supabase.rest.fullname" . }}
   labels:
     {{- include "supabase.labels" . | nindent 4 }}
-    app.kubernetes.io/component: rest
-    {{- with .Values.rest.serviceMonitor.labels }}
+    {{- with .Values.rest.monitoring.serviceMonitor.additionalLabels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
-  {{- with .Values.rest.serviceMonitor.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
 spec:
-  {{- if .Values.rest.serviceMonitor.jobLabel }}
-  jobLabel: {{ .Values.rest.serviceMonitor.jobLabel }}
-  {{- end }}
   selector:
     matchLabels:
-      {{- include "supabase.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: rest
+      {{- include "supabase.rest.selectorLabels" . | nindent 6 }}
   endpoints:
-    - port: {{ .Values.rest.serviceMonitor.port | default "http" }}
-      {{- if .Values.rest.serviceMonitor.interval }}
-      interval: {{ .Values.rest.serviceMonitor.interval }}
-      {{- end }}
-      {{- if .Values.rest.serviceMonitor.path }}
-      path: {{ .Values.rest.serviceMonitor.path }}
-      {{- end }}
-      {{- if .Values.rest.serviceMonitor.scheme }}
-      scheme: {{ .Values.rest.serviceMonitor.scheme }}
-      {{- end }}
-      {{- if .Values.rest.serviceMonitor.scrapeTimeout }}
-      scrapeTimeout: {{ .Values.rest.serviceMonitor.scrapeTimeout }}
-      {{- end }}
-      {{- if .Values.rest.serviceMonitor.honorLabels }}
-      honorLabels: {{ .Values.rest.serviceMonitor.honorLabels }}
-      {{- end }}
-      {{- if .Values.rest.serviceMonitor.honorTimestamps }}
-      honorTimestamps: {{ .Values.rest.serviceMonitor.honorTimestamps }}
-      {{- end }}
-      {{- if .Values.rest.serviceMonitor.metricRelabelings }}
-      metricRelabelings:
-        {{- toYaml .Values.rest.serviceMonitor.metricRelabelings | nindent 8 }}
-      {{- end }}
-      {{- if .Values.rest.serviceMonitor.relabelings }}
-      relabelings:
-        {{- toYaml .Values.rest.serviceMonitor.relabelings | nindent 8 }}
-      {{- end }}
-      {{- if .Values.rest.serviceMonitor.tlsConfig }}
-      tlsConfig:
-        {{- toYaml .Values.rest.serviceMonitor.tlsConfig | nindent 8 }}
-      {{- end }}
-  {{- if .Values.rest.serviceMonitor.targetLabels }}
-  targetLabels:
-    {{- toYaml .Values.rest.serviceMonitor.targetLabels | nindent 4 }}
-  {{- end }}
-  {{- if .Values.rest.serviceMonitor.podTargetLabels }}
-  podTargetLabels:
-    {{- toYaml .Values.rest.serviceMonitor.podTargetLabels | nindent 4 }}
-  {{- end }}
-  {{- if .Values.rest.serviceMonitor.sampleLimit }}
-  sampleLimit: {{ .Values.rest.serviceMonitor.sampleLimit }}
-  {{- end }}
-  {{- if .Values.rest.serviceMonitor.targetLimit }}
-  targetLimit: {{ .Values.rest.serviceMonitor.targetLimit }}
-  {{- end }}
+  - port: http
+    interval: {{ .Values.rest.monitoring.serviceMonitor.interval }}
+    path: {{ .Values.rest.monitoring.serviceMonitor.path }}
+    {{- with .Values.rest.monitoring.serviceMonitor.metricRelabelings }}
+    metricRelabelings:
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.rest.monitoring.serviceMonitor.relabelings }}
+    relabelings:
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
 {{- end }}

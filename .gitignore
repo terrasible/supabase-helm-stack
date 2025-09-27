@@ -1,32 +1,52 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
-# Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
+# Helm chart dependencies
+charts/*/charts/
+charts/*/Chart.lock
 
-# Test binary, built with `go test -c`
-*.test
+# Chart dependencies (users should run 'helm dependency update')
+charts/supabase/charts/
 
-# Code coverage profiles and other test artifacts
-*.out
-coverage.*
-*.coverprofile
-profile.cov
+# Temporary files
+*.tmp
+*.trae/
+.trae/
+*CLAUDE.md
+*.temp
+*.swp
+*.swo
+*~
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
-
-# Go workspace file
-go.work
-go.work.sum
-
-# env file
+# Environment files
 .env
+.env.local
+.env.*.local
 
-# Editor/IDE
-# .idea/
-# .vscode/
+# Editor/IDE files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+test-results/
+coverage/
+*.log
+
+# Kubernetes manifests (generated)
+manifests/
+rendered/
+
+# Secrets and sensitive files
+secrets.yaml
+*.key
+*.pem
+*.crt
+*.p12
+
+# Local development
+.local/
+tmp/
+temp/
+.trae/
+CLAUDE.md
