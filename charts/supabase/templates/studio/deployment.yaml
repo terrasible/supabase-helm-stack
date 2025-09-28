@@ -1,0 +1,76 @@
+{{- if .Values.studio.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "supabase.studio.fullname" . }}
+  labels:
+    {{- include "supabase.studio.labels" . | nindent 4 }}
+spec:
+  {{- if not (and .Values.studio.autoscaling .Values.studio.autoscaling.enabled) }}
+  replicas: {{ .Values.studio.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "supabase.studio.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.studio.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "supabase.studio.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.studio.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "supabase.studio.serviceAccountName" . }}
+      {{- if .Values.studio.podSecurityContext }}
+      podSecurityContext:
+        {{- include "supabase.component.podSecurityContext" (dict "Values" .Values "component" "studio" "context" .) | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ include "supabase.studio.name" . }}
+          {{- include "supabase.component.securityContext" (dict "Values" .Values "component" "studio" "context" .) | nindent 10 }}
+          image: "{{ .Values.studio.image.repository | default "supabase/studio" }}:{{ .Values.studio.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.studio.image.pullPolicy }}
+          command: ["studio"]
+          env:
+            {{- range $key, $value := .Values.studio.environment }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- if .Values.db.enabled }}
+            - name: DATABASE_HOST
+              value: {{ include "supabase.db.fullname" . }}
+            {{- end }}
+          {{- if and .Values.global.csi .Values.global.csi.enabled }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.csi.secretName | default "" }}
+          {{- else if .Values.global.defaultSecretName }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.defaultSecretName }}
+          {{- else }}
+          envFrom:
+            - secretRef:
+                name: {{ include "supabase.secretName" . }}
+          {{- end }}
+          {{- include "supabase.component.healthChecks" (dict "Values" .Values "component" "studio" "context" .) | nindent 10 }}
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          {{- include "supabase.component.resources" (dict "Values" .Values "component" "studio" "context" .) | nindent 10 }}
+          {{- with .Values.studio.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.studio.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- include "supabase.component.scheduling" (dict "Values" .Values "component" "studio" "context" .) | nindent 6 }}
+{{- end }}

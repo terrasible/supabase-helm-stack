@@ -1,0 +1,155 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "supabase.fullname" . }}-services-test"
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+  - name: services-test
+    image: curlimages/curl:8.5.0
+    command: ["/bin/sh"]
+    args:
+      - -c
+      - |
+        set -e
+        echo "🧪 Testing Individual Supabase Services..."
+
+        # Test PostgreSQL
+        {{- if .Values.postgresql.enabled }}
+        echo "🐘 Testing PostgreSQL connectivity..."
+        if nc -z {{ include "supabase.postgresql.host" . }} {{ include "supabase.postgresql.port" . }}; then
+          echo "✅ PostgreSQL is accessible"
+        else
+          echo "❌ PostgreSQL is not accessible"
+          exit 1
+        fi
+        {{- else }}
+        echo "⚠️  PostgreSQL is disabled, skipping test"
+        {{- end }}
+
+        # Test Auth Service
+        {{- if .Values.auth.enabled }}
+        echo "🔐 Testing Auth service..."
+        AUTH_SERVICE="{{ include "supabase.fullname" . }}-auth"
+        if curl -f -s --max-time 10 "http://$AUTH_SERVICE:{{ .Values.auth.service.port }}/health" > /dev/null; then
+          echo "✅ Auth service is healthy"
+        else
+          echo "❌ Auth service health check failed"
+          exit 1
+        fi
+        {{- else }}
+        echo "⚠️  Auth service is disabled, skipping test"
+        {{- end }}
+
+        # Test REST API Service
+        {{- if .Values.rest.enabled }}
+        echo "🌐 Testing REST API service..."
+        REST_SERVICE="{{ include "supabase.fullname" . }}-rest"
+        if curl -f -s --max-time 10 "http://$REST_SERVICE:{{ .Values.rest.service.port }}/" > /dev/null; then
+          echo "✅ REST API service is accessible"
+        else
+          echo "❌ REST API service is not accessible"
+          exit 1
+        fi
+        {{- else }}
+        echo "⚠️  REST API service is disabled, skipping test"
+        {{- end }}
+
+        # Test Storage Service
+        {{- if .Values.storage.enabled }}
+        echo "📁 Testing Storage service..."
+        STORAGE_SERVICE="{{ include "supabase.fullname" . }}-storage"
+        if curl -f -s --max-time 10 "http://$STORAGE_SERVICE:{{ .Values.storage.service.port }}/status" > /dev/null; then
+          echo "✅ Storage service is healthy"
+        else
+          echo "❌ Storage service health check failed"
+          exit 1
+        fi
+        {{- else }}
+        echo "⚠️  Storage service is disabled, skipping test"
+        {{- end }}
+
+        # Test Realtime Service
+        {{- if .Values.realtime.enabled }}
+        echo "⚡ Testing Realtime service..."
+        REALTIME_SERVICE="{{ include "supabase.fullname" . }}-realtime"
+        if curl -f -s --max-time 10 "http://$REALTIME_SERVICE:{{ .Values.realtime.service.port }}/" > /dev/null; then
+          echo "✅ Realtime service is accessible"
+        else
+          echo "❌ Realtime service is not accessible"
+          exit 1
+        fi
+        {{- else }}
+        echo "⚠️  Realtime service is disabled, skipping test"
+        {{- end }}
+
+        # Test Studio Service
+        {{- if .Values.studio.enabled }}
+        echo "🎨 Testing Studio service..."
+        STUDIO_SERVICE="{{ include "supabase.fullname" . }}-studio"
+        if curl -f -s --max-time 10 "http://$STUDIO_SERVICE:{{ .Values.studio.service.port }}/" > /dev/null; then
+          echo "✅ Studio service is accessible"
+        else
+          echo "❌ Studio service is not accessible"
+          exit 1
+        fi
+        {{- else }}
+        echo "⚠️  Studio service is disabled, skipping test"
+        {{- end }}
+
+        # Test Meta Service
+        {{- if .Values.meta.enabled }}
+        echo "📊 Testing Meta service..."
+        META_SERVICE="{{ include "supabase.fullname" . }}-meta"
+        if curl -f -s --max-time 10 "http://$META_SERVICE:{{ .Values.meta.service.port }}/health" > /dev/null; then
+          echo "✅ Meta service is healthy"
+        else
+          echo "❌ Meta service health check failed"
+          exit 1
+        fi
+        {{- else }}
+        echo "⚠️  Meta service is disabled, skipping test"
+        {{- end }}
+
+        # Test Functions Service
+        {{- if .Values.functions.enabled }}
+        echo "⚙️  Testing Functions service..."
+        FUNCTIONS_SERVICE="{{ include "supabase.fullname" . }}-functions"
+        if curl -f -s --max-time 10 "http://$FUNCTIONS_SERVICE:{{ .Values.functions.service.port }}/" > /dev/null; then
+          echo "✅ Functions service is accessible"
+        else
+          echo "❌ Functions service is not accessible"
+          exit 1
+        fi
+        {{- else }}
+        echo "⚠️  Functions service is disabled, skipping test"
+        {{- end }}
+
+        # Test MinIO (if enabled)
+        {{- if .Values.minio.enabled }}
+        echo "🪣 Testing MinIO service..."
+        MINIO_SERVICE="{{ include "supabase.fullname" . }}-minio"
+        if curl -f -s --max-time 10 "http://$MINIO_SERVICE:{{ .Values.minio.service.port }}/minio/health/live" > /dev/null; then
+          echo "✅ MinIO service is healthy"
+        else
+          echo "❌ MinIO service health check failed"
+          exit 1
+        fi
+        {{- else }}
+        echo "⚠️  MinIO service is disabled, skipping test"
+        {{- end }}
+
+        echo "✅ All enabled services are healthy!"
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi

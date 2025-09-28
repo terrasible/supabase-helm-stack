@@ -1,0 +1,27 @@
+{{- if and .Values.imgproxy.enabled (and .Values.imgproxy .Values.imgproxy.monitoring) .Values.imgproxy.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "supabase.imgproxy.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    {{- with .Values.imgproxy.monitoring.serviceMonitor.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "supabase.imgproxy.selectorLabels" . | nindent 6 }}
+  endpoints:
+  - port: http
+    interval: {{ .Values.imgproxy.monitoring.serviceMonitor.interval }}
+    path: {{ .Values.imgproxy.monitoring.serviceMonitor.path }}
+    {{- with .Values.imgproxy.monitoring.serviceMonitor.metricRelabelings }}
+    metricRelabelings:
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.imgproxy.monitoring.serviceMonitor.relabelings }}
+    relabelings:
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

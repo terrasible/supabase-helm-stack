@@ -1,0 +1,23 @@
+{{- if and .Values.storage.enabled (and .Values.storage.networkPolicy (and .Values.storage .Values.storage.networkPolicy) .Values.storage.networkPolicy.enabled) }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "supabase.storage.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "supabase.storage.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  {{- with .Values.storage.networkPolicy.ingress }}
+  ingress:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.storage.networkPolicy.egress }}
+  egress:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

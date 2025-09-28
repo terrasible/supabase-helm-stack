@@ -1,0 +1,27 @@
+{{- if and .Values.meta.enabled (and .Values.meta .Values.meta.monitoring) .Values.meta.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "supabase.meta.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    {{- with .Values.meta.monitoring.serviceMonitor.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "supabase.meta.selectorLabels" . | nindent 6 }}
+  endpoints:
+  - port: http
+    interval: {{ .Values.meta.monitoring.serviceMonitor.interval }}
+    path: {{ .Values.meta.monitoring.serviceMonitor.path }}
+    {{- with .Values.meta.monitoring.serviceMonitor.metricRelabelings }}
+    metricRelabelings:
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.meta.monitoring.serviceMonitor.relabelings }}
+    relabelings:
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

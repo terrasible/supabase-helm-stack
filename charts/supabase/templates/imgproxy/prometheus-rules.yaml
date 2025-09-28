@@ -1,0 +1,16 @@
+{{- if and .Values.imgproxy.enabled (and .Values.imgproxy .Values.imgproxy.monitoring) .Values.imgproxy.monitoring.enabled .Values.imgproxy.monitoring.prometheusRules.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "supabase.imgproxy.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    {{- with .Values.imgproxy.monitoring.prometheusRules.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: {{ include "supabase.imgproxy.fullname" . }}
+      rules:
+        {{- toYaml .Values.imgproxy.monitoring.prometheusRules.rules | nindent 8 }}
+{{- end }}

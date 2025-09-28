@@ -1,0 +1,9 @@
+# Gitleaks configuration for Supabase Helm Stack
+
+[allowlist]
+  description = "Allowlist for Supabase Helm Stack"
+  paths = [
+    "\\.secrets\\.baseline",
+    ".*\\.ya?ml$",
+    ".*\\.md$"
+  ]

@@ -1,0 +1,67 @@
+{{- if and .Values.storage.enabled (and .Values.storage.kong (and .Values.storage .Values.storage.kong) .Values.storage.kong.enabled) }}
+apiVersion: configuration.konghq.com/v1
+kind: KongService
+metadata:
+  name: {{ include "supabase.storage.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  host: {{ include "supabase.storage.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+  port: {{ .Values.storage.service.port }}
+  protocol: http
+  {{- with .Values.storage.kong.path }}
+  path: {{ .Values }}
+  {{- end }}
+  {{- with .Values.storage.kong.retries }}
+  retries: {{ .Values }}
+  {{- end }}
+  {{- with .Values.storage.kong.connectTimeout }}
+  connect_timeout: {{ .Values }}
+  {{- end }}
+  {{- with .Values.storage.kong.writeTimeout }}
+  write_timeout: {{ .Values }}
+  {{- end }}
+  {{- with .Values.storage.kong.readTimeout }}
+  read_timeout: {{ .Values }}
+  {{- end }}
+---
+{{- if and .Values.storage.kong.route .Values.storage.kong.route.enabled }}
+apiVersion: configuration.konghq.com/v1
+kind: KongRoute
+metadata:
+  name: {{ include "supabase.storage.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  service:
+    name: {{ include "supabase.storage.fullname" . }}
+  paths:
+    {{- toYaml .Values.storage.kong.route.paths | nindent 4 }}
+  strip_path: {{ .Values.storage.kong.route.stripPath }}
+  {{- with .Values.storage.kong.route.methods }}
+  methods:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.storage.kong.route.protocols }}
+  protocols:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+---
+{{- if and .Values.storage.kong .Values.storage.kong.plugins }}
+{{- range $plugin := .Values.storage.kong.plugins }}
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: {{ include "supabase.storage.fullname" $ }}-{{ $plugin.name }}
+  labels:
+    {{- include "supabase.labels" $ | nindent 4 }}
+plugin: {{ $plugin.name }}
+{{- with $plugin.config }}
+config:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+---
+{{- end }}
+{{- end }}
+{{- end }}

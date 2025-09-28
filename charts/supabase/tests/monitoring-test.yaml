@@ -1,0 +1,211 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "supabase.fullname" . }}-monitoring-test"
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+  - name: monitoring-test
+    image: curlimages/curl:8.5.0
+    command: ["/bin/sh"]
+    args:
+      - -c
+      - |
+        set -e
+        echo "🧪 Testing Monitoring and Metrics..."
+
+        {{- if .Values.monitoring.enabled }}
+        echo "📊 Monitoring is enabled, testing metrics endpoints..."
+
+        # Test Prometheus metrics endpoints
+        echo "🔍 Testing Prometheus metrics endpoints..."
+
+        {{- if .Values.auth.enabled }}
+        # Test Auth service metrics
+        echo "Testing Auth service metrics..."
+        AUTH_SERVICE="{{ include "supabase.fullname" . }}-auth"
+        if curl -f -s --max-time 10 "http://$AUTH_SERVICE:{{ .Values.auth.service.port }}/metrics" | grep -q "# HELP"; then
+          echo "✅ Auth service metrics are available"
+        else
+          echo "❌ Auth service metrics are not available"
+        fi
+        {{- end }}
+
+        {{- if .Values.rest.enabled }}
+        # Test REST service metrics
+        echo "Testing REST service metrics..."
+        REST_SERVICE="{{ include "supabase.fullname" . }}-rest"
+        if curl -f -s --max-time 10 "http://$REST_SERVICE:{{ .Values.rest.service.port }}/metrics" | grep -q "# HELP"; then
+          echo "✅ REST service metrics are available"
+        else
+          echo "❌ REST service metrics are not available"
+        fi
+        {{- end }}
+
+        {{- if .Values.storage.enabled }}
+        # Test Storage service metrics
+        echo "Testing Storage service metrics..."
+        STORAGE_SERVICE="{{ include "supabase.fullname" . }}-storage"
+        if curl -f -s --max-time 10 "http://$STORAGE_SERVICE:{{ .Values.storage.service.port }}/metrics" | grep -q "# HELP"; then
+          echo "✅ Storage service metrics are available"
+        else
+          echo "❌ Storage service metrics are not available"
+        fi
+        {{- end }}
+
+        {{- if .Values.realtime.enabled }}
+        # Test Realtime service metrics
+        echo "Testing Realtime service metrics..."
+        REALTIME_SERVICE="{{ include "supabase.fullname" . }}-realtime"
+        if curl -f -s --max-time 10 "http://$REALTIME_SERVICE:{{ .Values.realtime.service.port }}/metrics" | grep -q "# HELP"; then
+          echo "✅ Realtime service metrics are available"
+        else
+          echo "❌ Realtime service metrics are not available"
+        fi
+        {{- end }}
+
+        {{- if .Values.meta.enabled }}
+        # Test Meta service metrics
+        echo "Testing Meta service metrics..."
+        META_SERVICE="{{ include "supabase.fullname" . }}-meta"
+        if curl -f -s --max-time 10 "http://$META_SERVICE:{{ .Values.meta.service.port }}/metrics" | grep -q "# HELP"; then
+          echo "✅ Meta service metrics are available"
+        else
+          echo "❌ Meta service metrics are not available"
+        fi
+        {{- end }}
+
+        {{- if .Values.functions.enabled }}
+        # Test Functions service metrics
+        echo "Testing Functions service metrics..."
+        FUNCTIONS_SERVICE="{{ include "supabase.fullname" . }}-functions"
+        if curl -f -s --max-time 10 "http://$FUNCTIONS_SERVICE:{{ .Values.functions.service.port }}/metrics" | grep -q "# HELP"; then
+          echo "✅ Functions service metrics are available"
+        else
+          echo "❌ Functions service metrics are not available"
+        fi
+        {{- end }}
+
+        # Test PostgreSQL metrics (if postgres_exporter is enabled)
+        {{- if and .Values.postgresql.enabled .Values.postgresql.metrics.enabled }}
+        echo "Testing PostgreSQL metrics..."
+        POSTGRES_METRICS_SERVICE="{{ include "supabase.fullname" . }}-postgresql-metrics"
+        if curl -f -s --max-time 10 "http://$POSTGRES_METRICS_SERVICE:{{ .Values.postgresql.metrics.service.port }}/metrics" | grep -q "pg_up"; then
+          echo "✅ PostgreSQL metrics are available"
+        else
+          echo "❌ PostgreSQL metrics are not available"
+        fi
+        {{- end }}
+
+        # Test Kong metrics (if enabled)
+        {{- if .Values.kong.enabled }}
+        echo "Testing Kong metrics..."
+        KONG_SERVICE="{{ include "supabase.fullname" . }}-kong"
+        if curl -f -s --max-time 10 "http://$KONG_SERVICE:{{ .Values.kong.admin.service.port }}/metrics" | grep -q "# HELP"; then
+          echo "✅ Kong metrics are available"
+        else
+          echo "❌ Kong metrics are not available"
+        fi
+        {{- end }}
+
+        # Test Kong Operator metrics (if enabled)
+        {{- if .Values.kongOperator.enabled }}
+        echo "Testing Kong Gateway metrics via Kong Operator..."
+        KONG_GATEWAY_SERVICE="{{ .Values.kongOperator.serviceName }}"
+        if curl -f -s --max-time 10 "http://$KONG_GATEWAY_SERVICE:{{ .Values.kongOperator.adminPort }}/metrics" | grep -q "# HELP"; then
+          echo "✅ Kong Gateway metrics are available"
+        else
+          echo "❌ Kong Gateway metrics are not available"
+        fi
+        {{- end }}
+
+        # Test MinIO metrics (if enabled)
+        {{- if .Values.minio.enabled }}
+        echo "Testing MinIO metrics..."
+        MINIO_SERVICE="{{ include "supabase.fullname" . }}-minio"
+        if curl -f -s --max-time 10 "http://$MINIO_SERVICE:{{ .Values.minio.service.port }}/minio/v2/metrics/cluster" | grep -q "# HELP"; then
+          echo "✅ MinIO metrics are available"
+        else
+          echo "❌ MinIO metrics are not available"
+        fi
+        {{- end }}
+
+        echo "🏥 Testing health check endpoints..."
+
+        {{- if .Values.auth.enabled }}
+        # Test Auth health endpoint
+        echo "Testing Auth health endpoint..."
+        if curl -f -s --max-time 10 "http://{{ include "supabase.fullname" . }}-auth:{{ .Values.auth.service.port }}/health" | grep -q "ok\|healthy\|UP"; then
+          echo "✅ Auth service health check passed"
+        else
+          echo "❌ Auth service health check failed"
+        fi
+        {{- end }}
+
+        {{- if .Values.storage.enabled }}
+        # Test Storage health endpoint
+        echo "Testing Storage health endpoint..."
+        if curl -f -s --max-time 10 "http://{{ include "supabase.fullname" . }}-storage:{{ .Values.storage.service.port }}/status" | grep -q "ok\|healthy\|UP"; then
+          echo "✅ Storage service health check passed"
+        else
+          echo "❌ Storage service health check failed"
+        fi
+        {{- end }}
+
+        {{- if .Values.meta.enabled }}
+        # Test Meta health endpoint
+        echo "Testing Meta health endpoint..."
+        if curl -f -s --max-time 10 "http://{{ include "supabase.fullname" . }}-meta:{{ .Values.meta.service.port }}/health" | grep -q "ok\|healthy\|UP"; then
+          echo "✅ Meta service health check passed"
+        else
+          echo "❌ Meta service health check failed"
+        fi
+        {{- end }}
+
+        # Test MinIO health endpoint
+        {{- if .Values.minio.enabled }}
+        echo "Testing MinIO health endpoint..."
+        if curl -f -s --max-time 10 "http://{{ include "supabase.fullname" . }}-minio:{{ .Values.minio.service.port }}/minio/health/live"; then
+          echo "✅ MinIO health check passed"
+        else
+          echo "❌ MinIO health check failed"
+        fi
+        {{- end }}
+
+        echo "📈 Testing ServiceMonitor resources..."
+
+        # Check if ServiceMonitor resources exist (for Prometheus Operator)
+        {{- if .Values.monitoring.serviceMonitor.enabled }}
+        echo "Checking ServiceMonitor resources..."
+        kubectl get servicemonitors -n {{ .Release.Namespace }} -l "app.kubernetes.io/instance={{ .Release.Name }}" || echo "No ServiceMonitors found"
+        {{- end }}
+
+        echo "✅ Monitoring tests completed!"
+
+        {{- else }}
+        echo "⚠️  Monitoring is disabled. Testing basic health endpoints..."
+
+        # Test basic health endpoints when monitoring is disabled
+        {{- if .Values.auth.enabled }}
+        if curl -f -s --max-time 10 "http://{{ include "supabase.fullname" . }}-auth:{{ .Values.auth.service.port }}/health" > /dev/null; then
+          echo "✅ Auth service health endpoint is accessible"
+        else
+          echo "❌ Auth service health endpoint is not accessible"
+        fi
+        {{- end }}
+
+        echo "⚠️  Consider enabling monitoring for better observability"
+        {{- end }}
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi

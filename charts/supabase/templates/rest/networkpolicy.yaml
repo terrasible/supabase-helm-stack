@@ -1,0 +1,23 @@
+{{- if and .Values.rest.enabled (and .Values.rest.networkPolicy (and .Values.rest .Values.rest.networkPolicy) .Values.rest.networkPolicy.enabled) }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "supabase.rest.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "supabase.rest.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  {{- with .Values.rest.networkPolicy.ingress }}
+  ingress:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.rest.networkPolicy.egress }}
+  egress:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

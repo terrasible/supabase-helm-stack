@@ -1,0 +1,152 @@
+# Example values.yaml for Supabase with Kong Operator integration
+# This configuration assumes you have Kong Operator installed and a Kong Gateway instance running
+
+# Kong Operator Configuration
+kongOperator:
+  enabled: true
+  serviceNamespace: "kong-system"  # Namespace where Kong Gateway is deployed
+  serviceName: "kong-gateway"       # Name of the Kong Gateway service
+  servicePort: 8000                 # Kong Gateway proxy port
+  adminApi:
+    serviceName: "kong-admin"       # Name of the Kong Admin API service
+    servicePort: 8001               # Kong Admin API port
+
+# Supabase Configuration
+supabase:
+  url: "https://your-supabase-domain.com"
+  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvdXItcHJvamVjdC1pZCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNjQwOTk1MjAwLCJleHAiOjE5NTY1NzEyMDB9.example"
+  serviceKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvdXItcHJvamVjdC1pZCIsInJvbGUiOiJzZXJ2aWNlX3JvbGUiLCJpYXQiOjE2NDA5OTUyMDAsImV4cCI6MTk1NjU3MTIwMH0.example"
+
+# PostgreSQL Configuration
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "your-secure-postgres-password"
+    database: "supabase"
+    username: "postgres"
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: "fast-ssd"  # Use appropriate storage class
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+
+# Auth Service Configuration
+auth:
+  enabled: true
+  replicaCount: 2
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  config:
+    jwtSecret: "your-jwt-secret-key"
+    jwtExpiry: 3600
+    siteUrl: "https://your-supabase-domain.com"
+    externalUrl: "https://your-supabase-domain.com"
+
+# REST API Configuration
+rest:
+  enabled: true
+  replicaCount: 2
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Realtime Configuration
+realtime:
+  enabled: true
+  replicaCount: 2
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Storage Configuration
+storage:
+  enabled: true
+  replicaCount: 2
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  config:
+    storageBackend: "s3"  # or "file" for local storage
+    s3:
+      bucket: "your-s3-bucket"
+      region: "us-east-1"
+      accessKeyId: "your-access-key"
+      secretAccessKey: "your-secret-key"
+
+# Studio Configuration
+studio:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Meta Configuration
+meta:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Network Policies
+networkPolicies:
+  enabled: true
+  cilium:
+    enabled: false  # Set to true if using Cilium CNI
+
+# Monitoring
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: "monitoring"
+
+# Security
+security:
+  podSecurityPolicy:
+    enabled: true
+  rbac:
+    create: true
+
+# Ingress (optional - Kong Gateway handles routing)
+ingress:
+  enabled: false  # Disabled when using Kong Operator
+
+# Global settings
+global:
+  imageRegistry: "docker.io"
+  imagePullSecrets: []
+  storageClass: "fast-ssd"

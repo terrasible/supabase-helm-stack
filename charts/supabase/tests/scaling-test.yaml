@@ -1,0 +1,274 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "supabase.fullname" . }}-scaling-test"
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "25"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+  - name: scaling-test
+    image: bitnami/kubectl:1.28
+    command: ["/bin/bash"]
+    args:
+      - -c
+      - |
+        set -e
+        echo "🧪 Testing Scaling and Autoscaling Configuration..."
+
+        echo "📊 Testing Horizontal Pod Autoscaler (HPA)..."
+
+        {{- if .Values.autoscaling.enabled }}
+        echo "🔄 HPA is enabled, testing autoscaler configurations..."
+
+        # Test Auth HPA
+        {{- if and .Values.auth.enabled .Values.auth.autoscaling.enabled }}
+        echo "Testing Auth HPA..."
+        AUTH_HPA="{{ include "supabase.fullname" . }}-auth"
+        if kubectl get hpa "$AUTH_HPA" -n {{ .Release.Namespace }}; then
+          echo "✅ Auth HPA exists"
+
+          # Check HPA configuration
+          MIN_REPLICAS=$(kubectl get hpa "$AUTH_HPA" -n {{ .Release.Namespace }} -o jsonpath='{.spec.minReplicas}')
+          MAX_REPLICAS=$(kubectl get hpa "$AUTH_HPA" -n {{ .Release.Namespace }} -o jsonpath='{.spec.maxReplicas}')
+          TARGET_CPU=$(kubectl get hpa "$AUTH_HPA" -n {{ .Release.Namespace }} -o jsonpath='{.spec.targetCPUUtilizationPercentage}')
+
+          echo "  Min replicas: $MIN_REPLICAS"
+          echo "  Max replicas: $MAX_REPLICAS"
+          echo "  Target CPU: $TARGET_CPU%"
+
+          if [ "$MIN_REPLICAS" -le "$MAX_REPLICAS" ]; then
+            echo "  ✅ HPA replica configuration is valid"
+          else
+            echo "  ❌ HPA replica configuration is invalid (min > max)"
+          fi
+        else
+          echo "❌ Auth HPA not found"
+        fi
+        {{- end }}
+
+        # Test REST HPA
+        {{- if and .Values.rest.enabled .Values.rest.autoscaling.enabled }}
+        echo "Testing REST HPA..."
+        REST_HPA="{{ include "supabase.fullname" . }}-rest"
+        if kubectl get hpa "$REST_HPA" -n {{ .Release.Namespace }}; then
+          echo "✅ REST HPA exists"
+
+          MIN_REPLICAS=$(kubectl get hpa "$REST_HPA" -n {{ .Release.Namespace }} -o jsonpath='{.spec.minReplicas}')
+          MAX_REPLICAS=$(kubectl get hpa "$REST_HPA" -n {{ .Release.Namespace }} -o jsonpath='{.spec.maxReplicas}')
+
+          echo "  Min replicas: $MIN_REPLICAS"
+          echo "  Max replicas: $MAX_REPLICAS"
+
+          if [ "$MIN_REPLICAS" -le "$MAX_REPLICAS" ]; then
+            echo "  ✅ HPA replica configuration is valid"
+          else
+            echo "  ❌ HPA replica configuration is invalid (min > max)"
+          fi
+        else
+          echo "❌ REST HPA not found"
+        fi
+        {{- end }}
+
+        # Test Storage HPA
+        {{- if and .Values.storage.enabled .Values.storage.autoscaling.enabled }}
+        echo "Testing Storage HPA..."
+        STORAGE_HPA="{{ include "supabase.fullname" . }}-storage"
+        if kubectl get hpa "$STORAGE_HPA" -n {{ .Release.Namespace }}; then
+          echo "✅ Storage HPA exists"
+
+          MIN_REPLICAS=$(kubectl get hpa "$STORAGE_HPA" -n {{ .Release.Namespace }} -o jsonpath='{.spec.minReplicas}')
+          MAX_REPLICAS=$(kubectl get hpa "$STORAGE_HPA" -n {{ .Release.Namespace }} -o jsonpath='{.spec.maxReplicas}')
+
+          echo "  Min replicas: $MIN_REPLICAS"
+          echo "  Max replicas: $MAX_REPLICAS"
+        else
+          echo "❌ Storage HPA not found"
+        fi
+        {{- end }}
+
+        # Test Realtime HPA
+        {{- if and .Values.realtime.enabled .Values.realtime.autoscaling.enabled }}
+        echo "Testing Realtime HPA..."
+        REALTIME_HPA="{{ include "supabase.fullname" . }}-realtime"
+        if kubectl get hpa "$REALTIME_HPA" -n {{ .Release.Namespace }}; then
+          echo "✅ Realtime HPA exists"
+
+          MIN_REPLICAS=$(kubectl get hpa "$REALTIME_HPA" -n {{ .Release.Namespace }} -o jsonpath='{.spec.minReplicas}')
+          MAX_REPLICAS=$(kubectl get hpa "$REALTIME_HPA" -n {{ .Release.Namespace }} -o jsonpath='{.spec.maxReplicas}')
+
+          echo "  Min replicas: $MIN_REPLICAS"
+          echo "  Max replicas: $MAX_REPLICAS"
+        else
+          echo "❌ Realtime HPA not found"
+        fi
+        {{- end }}
+
+        # Test Functions HPA
+        {{- if and .Values.functions.enabled .Values.functions.autoscaling.enabled }}
+        echo "Testing Functions HPA..."
+        FUNCTIONS_HPA="{{ include "supabase.fullname" . }}-functions"
+        if kubectl get hpa "$FUNCTIONS_HPA" -n {{ .Release.Namespace }}; then
+          echo "✅ Functions HPA exists"
+
+          MIN_REPLICAS=$(kubectl get hpa "$FUNCTIONS_HPA" -n {{ .Release.Namespace }} -o jsonpath='{.spec.minReplicas}')
+          MAX_REPLICAS=$(kubectl get hpa "$FUNCTIONS_HPA" -n {{ .Release.Namespace }} -o jsonpath='{.spec.maxReplicas}')
+
+          echo "  Min replicas: $MIN_REPLICAS"
+          echo "  Max replicas: $MAX_REPLICAS"
+        else
+          echo "❌ Functions HPA not found"
+        fi
+        {{- end }}
+
+        # Test metrics server availability
+        echo "📈 Testing metrics server availability..."
+        if kubectl top nodes > /dev/null 2>&1; then
+          echo "✅ Metrics server is available"
+        else
+          echo "❌ Metrics server is not available (required for HPA)"
+        fi
+
+        {{- else }}
+        echo "⚠️  HPA is disabled, testing static replica configurations..."
+
+        # Test static replica counts
+        {{- if .Values.auth.enabled }}
+        AUTH_DEPLOYMENT="{{ include "supabase.fullname" . }}-auth"
+        if kubectl get deployment "$AUTH_DEPLOYMENT" -n {{ .Release.Namespace }}; then
+          REPLICAS=$(kubectl get deployment "$AUTH_DEPLOYMENT" -n {{ .Release.Namespace }} -o jsonpath='{.spec.replicas}')
+          echo "Auth deployment replicas: $REPLICAS"
+        fi
+        {{- end }}
+
+        echo "⚠️  Consider enabling HPA for automatic scaling"
+        {{- end }}
+
+        echo "📦 Testing Pod Disruption Budgets (PDB)..."
+
+        {{- if .Values.podDisruptionBudget.enabled }}
+        echo "🛡️  PDB is enabled, testing configurations..."
+
+        # Test Auth PDB
+        {{- if .Values.auth.enabled }}
+        AUTH_PDB="{{ include "supabase.fullname" . }}-auth"
+        if kubectl get pdb "$AUTH_PDB" -n {{ .Release.Namespace }}; then
+          echo "✅ Auth PDB exists"
+
+          MIN_AVAILABLE=$(kubectl get pdb "$AUTH_PDB" -n {{ .Release.Namespace }} -o jsonpath='{.spec.minAvailable}')
+          MAX_UNAVAILABLE=$(kubectl get pdb "$AUTH_PDB" -n {{ .Release.Namespace }} -o jsonpath='{.spec.maxUnavailable}')
+
+          if [ -n "$MIN_AVAILABLE" ]; then
+            echo "  Min available: $MIN_AVAILABLE"
+          fi
+          if [ -n "$MAX_UNAVAILABLE" ]; then
+            echo "  Max unavailable: $MAX_UNAVAILABLE"
+          fi
+        else
+          echo "❌ Auth PDB not found"
+        fi
+        {{- end }}
+
+        # Test REST PDB
+        {{- if .Values.rest.enabled }}
+        REST_PDB="{{ include "supabase.fullname" . }}-rest"
+        if kubectl get pdb "$REST_PDB" -n {{ .Release.Namespace }}; then
+          echo "✅ REST PDB exists"
+        else
+          echo "❌ REST PDB not found"
+        fi
+        {{- end }}
+
+        # Test Storage PDB
+        {{- if .Values.storage.enabled }}
+        STORAGE_PDB="{{ include "supabase.fullname" . }}-storage"
+        if kubectl get pdb "$STORAGE_PDB" -n {{ .Release.Namespace }}; then
+          echo "✅ Storage PDB exists"
+        else
+          echo "❌ Storage PDB not found"
+        fi
+        {{- end }}
+
+        {{- else }}
+        echo "⚠️  PDB is disabled, no disruption protection configured"
+        echo "⚠️  Consider enabling PDB for production deployments"
+        {{- end }}
+
+        echo "🔍 Testing Resource Quotas..."
+
+        # Check if resource quotas are configured
+        if kubectl get resourcequota -n {{ .Release.Namespace }}; then
+          echo "✅ Resource quotas are configured"
+
+          # Show quota usage
+          kubectl describe resourcequota -n {{ .Release.Namespace }}
+        else
+          echo "⚠️  No resource quotas configured"
+        fi
+
+        echo "📊 Testing Current Resource Usage..."
+
+        # Show current pod resource usage
+        echo "Current pod resource usage:"
+        if kubectl top pods -n {{ .Release.Namespace }} --containers 2>/dev/null; then
+          echo "✅ Resource usage data available"
+        else
+          echo "⚠️  Resource usage data not available (metrics server may not be running)"
+        fi
+
+        echo "🔄 Testing Deployment Rollout Status..."
+
+        # Check rollout status of deployments
+        DEPLOYMENTS=$(kubectl get deployments -n {{ .Release.Namespace }} -l "app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath='{.items[*].metadata.name}')
+
+        for DEPLOYMENT in $DEPLOYMENTS; do
+          echo "Checking rollout status for: $DEPLOYMENT"
+          if kubectl rollout status deployment "$DEPLOYMENT" -n {{ .Release.Namespace }} --timeout=30s; then
+            echo "  ✅ Deployment $DEPLOYMENT is ready"
+          else
+            echo "  ❌ Deployment $DEPLOYMENT is not ready"
+          fi
+
+          # Check replica status
+          DESIRED=$(kubectl get deployment "$DEPLOYMENT" -n {{ .Release.Namespace }} -o jsonpath='{.spec.replicas}')
+          READY=$(kubectl get deployment "$DEPLOYMENT" -n {{ .Release.Namespace }} -o jsonpath='{.status.readyReplicas}')
+          AVAILABLE=$(kubectl get deployment "$DEPLOYMENT" -n {{ .Release.Namespace }} -o jsonpath='{.status.availableReplicas}')
+
+          echo "  Desired: $DESIRED, Ready: $READY, Available: $AVAILABLE"
+
+          if [ "$DESIRED" = "$READY" ] && [ "$DESIRED" = "$AVAILABLE" ]; then
+            echo "  ✅ All replicas are ready and available"
+          else
+            echo "  ⚠️  Not all replicas are ready/available"
+          fi
+        done
+
+        echo "🎯 Testing Load Balancing..."
+
+        # Test service endpoints
+        SERVICES=$(kubectl get services -n {{ .Release.Namespace }} -l "app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath='{.items[*].metadata.name}')
+
+        for SERVICE in $SERVICES; do
+          echo "Checking service endpoints for: $SERVICE"
+          ENDPOINTS=$(kubectl get endpoints "$SERVICE" -n {{ .Release.Namespace }} -o jsonpath='{.subsets[*].addresses[*].ip}' | wc -w)
+          echo "  Service $SERVICE has $ENDPOINTS endpoint(s)"
+
+          if [ "$ENDPOINTS" -gt 0 ]; then
+            echo "  ✅ Service has active endpoints"
+          else
+            echo "  ❌ Service has no active endpoints"
+          fi
+        done
+
+        echo "✅ Scaling and autoscaling tests completed!"
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi

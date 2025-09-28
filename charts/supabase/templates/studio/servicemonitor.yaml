@@ -1,0 +1,27 @@
+{{- if and .Values.studio.enabled (and .Values.studio .Values.studio.monitoring) .Values.studio.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "supabase.studio.fullname" . }}
+  labels:
+    {{- include "supabase.studio.labels" . | nindent 4 }}
+    {{- with .Values.studio.monitoring.serviceMonitor.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "supabase.studio.selectorLabels" . | nindent 6 }}
+  endpoints:
+  - port: http
+    interval: {{ .Values.studio.monitoring.serviceMonitor.interval }}
+    path: {{ .Values.studio.monitoring.serviceMonitor.path }}
+    {{- with .Values.studio.monitoring.serviceMonitor.metricRelabelings }}
+    metricRelabelings:
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.studio.monitoring.serviceMonitor.relabelings }}
+    relabelings:
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

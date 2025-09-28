@@ -1,0 +1,15 @@
+{{- if and .Values.studio.enabled (and .Values.studio.rbac .Values.studio.rbac.create) .Values.studio.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "supabase.studio.fullname" . }}
+  labels:
+    {{- include "supabase.studio.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+{{- end }}

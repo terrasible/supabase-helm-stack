@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "supabase.fullname" . }}-test-connection"
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: test-connection
+      image: curlimages/curl:latest
+      command: ['sh', '-c']
+      args:
+        - |
+          set -e
+          echo "Testing Supabase Stack connectivity..."
+
+          # Test Kong Gateway health (via Kong Operator)
+          echo "Testing Kong Gateway health endpoint..."
+          {{- if .Values.kongOperator.enabled }}
+          curl -f http://{{ .Values.kongOperator.serviceName }}.{{ .Values.kongOperator.serviceNamespace }}:{{ .Values.kongOperator.servicePort }}/health || exit 1
+          {{- else }}
+          echo "⚠️ Kong Operator is disabled, skipping Kong health check"
+          {{- end }}
+          echo "✅ Kong Gateway is healthy"
+
+          # Test Auth service
+          echo "Testing Auth service health..."
+          curl -f http://{{ include "supabase.fullname" . }}-auth:{{ if and .Values.auth .Values.auth.service }}{{ .Values.auth.service.port | default 9999 }}{{ else }}9999{{ end }}/health || exit 1
+          echo "✅ Auth service is healthy"
+
+          # Test REST API
+          echo "Testing REST API health..."
+          curl -f http://{{ include "supabase.fullname" . }}-rest:{{ if and .Values.rest .Values.rest.service }}{{ .Values.rest.service.port | default 3000 }}{{ else }}3000{{ end }}/ || exit 1
+          echo "✅ REST API is healthy"
+
+          # Test Realtime service
+          echo "Testing Realtime service health..."
+          curl -f http://{{ include "supabase.fullname" . }}-realtime:{{ if and .Values.realtime .Values.realtime.service }}{{ .Values.realtime.service.port | default 4000 }}{{ else }}4000{{ end }}/api/health || exit 1
+          echo "✅ Realtime service is healthy"
+
+          # Test Storage service
+          echo "Testing Storage service health..."
+          curl -f http://{{ include "supabase.fullname" . }}-storage:{{ if and .Values.storage .Values.storage.service }}{{ .Values.storage.service.port | default 5000 }}{{ else }}5000{{ end }}/status || exit 1
+          echo "✅ Storage service is healthy"
+
+          # Test Meta service
+          echo "Testing Meta service health..."
+          curl -f http://{{ include "supabase.fullname" . }}-meta:{{ if and .Values.meta .Values.meta.service }}{{ .Values.meta.service.port | default 8080 }}{{ else }}8080{{ end }}/health || exit 1
+          echo "✅ Meta service is healthy"
+
+          {{- if .Values.studio.enabled }}
+          # Test Studio (if enabled)
+          echo "Testing Studio health..."
+          curl -f http://{{ include "supabase.fullname" . }}-studio:{{ if and .Values.studio .Values.studio.service }}{{ .Values.studio.service.port | default 3000 }}{{ else }}3000{{ end }}/api/profile || exit 1
+          echo "✅ Studio is healthy"
+          {{- end }}
+
+          {{- if .Values.functions.enabled }}
+          # Test Functions (if enabled)
+          echo "Testing Functions health..."
+          curl -f http://{{ include "supabase.fullname" . }}-functions:{{ if and .Values.functions .Values.functions.service }}{{ .Values.functions.service.port | default 9000 }}{{ else }}9000{{ end }}/functions/v1/_internal/health || exit 1
+          echo "✅ Functions service is healthy"
+          {{- end }}
+
+          echo "🎉 All connectivity tests passed!"
+  {{- with .Values.nodeSelector }}
+  nodeSelector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.affinity }}
+  affinity:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.tolerations }}
+  tolerations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}

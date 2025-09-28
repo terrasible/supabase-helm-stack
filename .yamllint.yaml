@@ -1,0 +1,77 @@
+# yamllint configuration for Supabase Helm Stack
+# See https://yamllint.readthedocs.io/en/stable/configuration.html
+
+extends: default
+
+rules:
+  # Line length - allow longer lines for Helm templates
+  line-length:
+    max: 120
+    level: warning
+
+  # Indentation - 2 spaces for YAML
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+    # Be more lenient with indentation for generated manifests
+    level: warning
+
+  # Comments - allow comments without space after #
+  comments:
+    min-spaces-from-content: 1
+    require-starting-space: false
+
+  # Comments indentation - disable to allow flexible comment placement
+  comments-indentation: disable
+
+  # Document start - allow for multi-document YAML files
+  document-start: disable
+
+  # Truthy values - allow yes/no, on/off
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']
+    check-keys: false
+
+  # Brackets - allow empty brackets
+  brackets:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+    min-spaces-inside-empty: 0
+    max-spaces-inside-empty: 0
+
+  # Braces - allow empty braces
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+    min-spaces-inside-empty: 0
+    max-spaces-inside-empty: 0
+
+  # Octal values - allow for file permissions
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: false
+
+  # Key duplicates - error on duplicate keys
+  key-duplicates: enable
+
+  # Empty lines
+  empty-lines:
+    max: 2
+    max-start: 0
+    max-end: 1
+
+  # Trailing spaces
+  trailing-spaces: enable
+
+  # New line at end of file
+  new-line-at-end-of-file: enable
+
+# Ignore certain files and patterns
+ignore: |
+  charts/*/templates/tests/
+  .github/
+  node_modules/
+  *.md
+  *-manifests.yaml
+  *-manifests-*.yaml

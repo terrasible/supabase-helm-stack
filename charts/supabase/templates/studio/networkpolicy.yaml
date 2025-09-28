@@ -1,0 +1,32 @@
+{{- if and .Values.studio.enabled (and .Values.studio .Values.studio.networkPolicy) .Values.studio.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "supabase.studio.fullname" . }}
+  labels:
+    {{- include "supabase.studio.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "supabase.studio.selectorLabels" . | nindent 6 }}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: {{ .Release.Namespace }}
+    - podSelector:
+        matchLabels:
+          {{- include "supabase.labels" . | nindent 10 }}
+    ports:
+    - protocol: TCP
+      port: {{ .Values.studio.service.port }}
+  egress:
+  - to: []
+    ports: []
+  {{- with .Values.studio.networkPolicy.egressRules }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+{{- end }}

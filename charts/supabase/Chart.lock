@@ -1,0 +1,33 @@
+dependencies:
+- name: postgresql
+  repository: https://charts.bitnami.com/bitnami
+  version: 16.7.27
+- name: postgresql-ha
+  repository: https://charts.bitnami.com/bitnami
+  version: 16.3.2
+- name: redis
+  repository: https://charts.bitnami.com/bitnami
+  version: 22.0.7
+- name: minio
+  repository: https://charts.bitnami.com/bitnami
+  version: 17.0.21
+- name: kong
+  repository: https://charts.konghq.com
+  version: 2.13.1
+- name: prometheus
+  repository: https://charts.bitnami.com/bitnami
+  version: 2.1.23
+- name: grafana
+  repository: https://charts.bitnami.com/bitnami
+  version: 12.1.8
+- name: vector
+  repository: https://helm.vector.dev
+  version: 0.22.0
+- name: ingress-nginx
+  repository: https://kubernetes.github.io/ingress-nginx
+  version: 4.5.2
+- name: cert-manager
+  repository: https://charts.jetstack.io
+  version: v1.11.0
+digest: sha256:4a8c7dc4b574eaa73c2e570b5b692f6ac39d4e5c9503c601e221e99774b8fc6e
+generated: "2025-09-23T19:54:16.783172+07:00"

@@ -1,0 +1,94 @@
+{{- if and .Values.kong.enabled .Values.kongOperator.enabled }}
+# Studio External Route (Main Dashboard)
+apiVersion: configuration.konghq.com/v1
+kind: KongIngress
+metadata:
+  name: {{ include "supabase.fullname" . }}-studio
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  routes:
+  - name: studio
+    paths:
+    - /
+    - /studio
+    protocols: ["http","https"]
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+  service:
+    name: {{ include "supabase.fullname" . }}-studio
+
+---
+# Auth Routes
+apiVersion: configuration.konghq.com/v1
+kind: KongRoute
+metadata:
+  name: {{ include "supabase.fullname" . }}-auth
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  service:
+    name: {{ include "supabase.fullname" . }}-auth
+  paths:
+  - /auth/v1/
+  - /auth/v1
+  strip_path: true
+  protocols: ["http","https"]
+
+---
+# REST API Routes
+apiVersion: configuration.konghq.com/v1
+kind: KongRoute
+metadata:
+  name: {{ include "supabase.fullname" . }}-rest
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  service:
+    name: {{ include "supabase.fullname" . }}-rest
+  paths:
+  - /rest/v1/
+  - /rest/v1
+  strip_path: true
+  protocols: ["http","https"]
+
+---
+# Realtime Routes
+apiVersion: configuration.konghq.com/v1
+kind: KongRoute
+metadata:
+  name: {{ include "supabase.fullname" . }}-realtime
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  service:
+    name: {{ include "supabase.fullname" . }}-realtime
+  paths:
+  - /realtime/v1/
+  - /realtime/v1
+  strip_path: true
+  protocols: ["http","https"]
+
+---
+# Storage Routes
+apiVersion: configuration.konghq.com/v1
+kind: KongRoute
+metadata:
+  name: {{ include "supabase.fullname" . }}-storage
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  service:
+    name: {{ include "supabase.fullname" . }}-storage
+  paths:
+  - /storage/v1/
+  - /storage/v1
+  strip_path: true
+  protocols: ["http","https"]
+{{- end }}

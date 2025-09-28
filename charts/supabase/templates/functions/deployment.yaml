@@ -1,0 +1,123 @@
+{{- if .Values.functions.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "supabase.functions.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  {{- if not (and .Values.functions.autoscaling .Values.functions.autoscaling.enabled) }}
+  replicas: {{ .Values.functions.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "supabase.functions.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.functions.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "supabase.functions.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.functions.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "supabase.functions.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.functions.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: init-db
+          image: postgres:15-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DB_HOST
+              {{- if .Values.db.enabled }}
+              value: {{ include "supabase.db.fullname" . | quote }}
+              {{- else }}
+              value: {{ .Values.auth.environment.DB_HOST | quote }}
+              {{- end }}
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  {{- include "supabase.secrets.secretKeyRef" (dict "Values" .Values "service" "db" "field" "username" "context" .) | nindent 18 }}
+            - name: DB_PORT
+              value: "{{ .Values.functions.environment.DB_PORT }}"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER"; do
+              echo "Waiting for database to start..."
+              sleep 2
+              done
+            - echo "Database is ready"
+      containers:
+        - name: {{ include "supabase.functions.name" $ }}
+          securityContext:
+            {{- toYaml .Values.functions.securityContext | nindent 12 }}
+          image: "{{ .Values.functions.image.repository }}:{{ .Values.functions.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.functions.image.pullPolicy }}
+          command: ["edge-runtime"]
+          env:
+            {{- range $key, $value := .Values.functions.environment }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- if .Values.db.enabled }}
+            - name: DB_HOST
+              value: {{ include "supabase.db.fullname" . }}
+            {{- end }}
+          {{- if and .Values.global.csi .Values.global.csi.enabled }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.csi.secretName | default "" }}
+          {{- else if .Values.global.defaultSecretName }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.defaultSecretName }}
+
+          {{- else }}
+          envFrom:
+            - secretRef:
+                name: {{ include "supabase.secretName" . }}
+
+          {{- end }}
+          {{- with .Values.functions.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.functions.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 9000
+              protocol: TCP
+          {{- with .Values.functions.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.functions.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.functions.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.functions.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.functions.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.functions.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,10 @@
+{{- if and .Values.functions.enabled (and .Values.functions.rbac .Values.functions.rbac.create) .Values.functions.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "supabase.functions.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+rules:
+  {{- toYaml .Values.functions.rbac.rules | nindent 2 }}
+{{- end }}

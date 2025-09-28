@@ -1,0 +1,94 @@
+# Pre-commit configuration for Supabase Helm Stack
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+
+repos:
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        exclude: ^charts/.*/templates/.*\.(yaml|yml)$|^charts/.*/tests/.*\.(yaml|yml)$
+        args: ["--unsafe"]
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-toml
+      - id: check-json
+      - id: pretty-format-json
+        args: ["--autofix"]
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+
+  # YAML formatting and linting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.37.1
+    hooks:
+      - id: yamllint
+        args: [-c=.yamllint.yaml]
+        files: \.(yaml|yml)$
+        exclude: ^charts/.*/templates/.*\.(yaml|yml)$|^charts/.*/tests/.*\.(yaml|yml)$
+
+  # Helm chart linting and validation
+  - repo: https://github.com/gruntwork-io/pre-commit
+    rev: v0.1.30
+    hooks:
+      - id: helmlint
+        files: charts/.*
+
+  # Security scanning
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ["--baseline", ".secrets.baseline"]
+        exclude: 'package.lock.json|supabase-manifests.*\.yaml|charts/.*/examples/.*\.yaml'
+
+  # Git secrets and credential leak detection
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  # Note: Kubernetes YAML validation can be done manually with:
+  # kubectl --dry-run=client apply -f <file>
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.45.0
+    hooks:
+      - id: markdownlint
+        args: ["--fix", "--config", ".markdownlint.yaml"]
+
+  # Shell script linting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+
+  # Dockerfile linting
+  # - repo: https://github.com/hadolint/hadolint
+  #   rev: v2.13.1
+  #   hooks:
+  #     - id: hadolint-docker
+  #       args: ['--ignore', 'DL3008', '--ignore', 'DL3009']
+
+  # Git commit message formatting
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.9.1
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+
+# Configuration for specific hooks
+default_language_version:
+  python: python3
+
+default_stages: [pre-commit]
+
+fail_fast: false
+
+minimum_pre_commit_version: "3.0.0"

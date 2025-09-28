@@ -1,0 +1,27 @@
+{{- if and .Values.analytics.enabled (and .Values.analytics .Values.analytics.monitoring) .Values.analytics.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "supabase.analytics.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    {{- with .Values.analytics.monitoring.serviceMonitor.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "supabase.analytics.selectorLabels" . | nindent 6 }}
+  endpoints:
+  - port: http
+    interval: {{ .Values.analytics.monitoring.serviceMonitor.interval }}
+    path: {{ .Values.analytics.monitoring.serviceMonitor.path }}
+    {{- with .Values.analytics.monitoring.serviceMonitor.metricRelabelings }}
+    metricRelabelings:
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.analytics.monitoring.serviceMonitor.relabelings }}
+    relabelings:
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

@@ -1,0 +1,28 @@
+# Markdownlint configuration for Supabase Helm Stack
+# See https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+
+# Extend the default configuration
+default: true
+
+# Line length - allow longer lines for documentation
+MD013:
+  line_length: 250
+  heading_line_length: 250
+  code_block_line_length: 250
+  tables: false
+
+# Allow emphasis as heading for stylistic purposes
+MD036: false
+
+# Allow duplicate headings in different sections
+MD024:
+  siblings_only: true
+
+# Allow inline HTML for better formatting
+MD033: false
+
+# Allow bare URLs
+MD034: false
+
+# First line in file
+MD041: false

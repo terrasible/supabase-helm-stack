@@ -1,0 +1,24 @@
+{{- if and .Values.analytics.enabled (and .Values.analytics .Values.analytics.podDisruptionBudget) .Values.analytics.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "supabase.fullname" . }}-analytics
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: analytics
+  {{- with .Values.analytics.podDisruptionBudget.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.analytics.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.analytics.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.analytics.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.analytics.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "supabase.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: analytics
+{{- end }}

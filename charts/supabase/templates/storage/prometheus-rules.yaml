@@ -1,0 +1,16 @@
+{{- if and .Values.storage.enabled (and .Values.storage.monitoring (and .Values.storage .Values.storage.monitoring) .Values.storage.monitoring.enabled) (and .Values.storage.monitoring.prometheusRules .Values.storage.monitoring.prometheusRules.enabled) }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "supabase.storage.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+    {{- with .Values.storage.monitoring.prometheusRules.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: {{ include "supabase.storage.fullname" . }}
+      rules:
+        {{- toYaml .Values.storage.monitoring.prometheusRules.rules | nindent 8 }}
+{{- end }}

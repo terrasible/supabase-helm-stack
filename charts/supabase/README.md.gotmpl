@@ -1,0 +1,102 @@
+{{ template "chart.header" . }}
+
+{{ template "chart.description" . }}
+
+{{ template "chart.versionBadge" . }}{{ template "chart.typeBadge" . }}{{ template "chart.appVersionBadge" . }}
+
+## Prerequisites
+
+### Kong Operator (Required)
+Before installing this chart, you must install the Kong Operator which provides the necessary CRDs:
+
+```bash
+# Install Kong Operator
+kubectl apply -f https://github.com/Kong/kubernetes-ingress-controller/releases/latest/download/all-in-one-dbless.yaml
+
+# Verify Kong Operator is running
+kubectl get pods -n kong-system
+```
+
+### Helm Dependencies
+This chart has dependencies that need to be downloaded:
+
+```bash
+# Update chart dependencies
+helm dependency update charts/supabase
+```
+
+## Installation
+
+### Quick Start
+```bash
+# Add the repository (if published)
+helm repo add supabase-helm https://your-repo-url
+
+# Install with default values
+helm install my-supabase supabase-helm/supabase
+
+# Or install from local chart
+helm install my-supabase ./charts/supabase
+```
+
+### Custom Installation
+```bash
+# Install with custom values
+helm install my-supabase ./charts/supabase -f my-values.yaml
+
+# Install in specific namespace
+helm install my-supabase ./charts/supabase --namespace supabase --create-namespace
+```
+
+## Configuration
+
+{{ template "chart.requirementsSection" . }}
+
+<!-- pragma: allowlist secret -->
+{{ template "chart.valuesSection" . }}
+
+## Examples
+
+See the [examples](./examples/) directory for various configuration scenarios:
+
+- **Kong Operator Integration**: Complete setup with Kong Gateway
+- **External Secrets**: Using external secret management
+- **Production Configuration**: Production-ready settings
+
+## Upgrading
+
+```bash
+# Upgrade to latest version
+helm upgrade my-supabase ./charts/supabase
+
+# Upgrade with new values
+helm upgrade my-supabase ./charts/supabase -f my-values.yaml
+```
+
+## Uninstalling
+
+```bash
+# Uninstall the release
+helm uninstall my-supabase
+
+# Clean up PVCs (if needed)
+kubectl delete pvc -l app.kubernetes.io/instance=my-supabase
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Kong CRDs not found**: Ensure Kong Operator is installed first
+2. **Secrets not found**: Check secret configuration in values.yaml
+3. **Pods not starting**: Check resource limits and node capacity
+
+### Getting Help
+
+- Check the [documentation](./docs/)
+- Review [examples](./examples/)
+- Open an issue on GitHub
+
+{{ template "chart.maintainersSection" . }}
+
+{{ template "chart.sourcesSection" . }}

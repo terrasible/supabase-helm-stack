@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "supabase.fullname" . }}-services-test"
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "4"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: supabase-services-test
+      image: curlimages/curl:latest
+      command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Testing Supabase Services..."
+
+          # Test Auth service
+          {{- if .Values.auth.enabled }}
+          echo "Testing Auth service..."
+          curl -f -s -o /dev/null http://{{ include "supabase.auth.fullname" . }}:{{ if and .Values.auth .Values.auth.service }}{{ .Values.auth.service.port | default 9999 }}{{ else }}9999{{ end }}/health
+          if [ $? -eq 0 ]; then
+            echo "✅ Auth service is healthy"
+          else
+            echo "❌ Auth service health check failed"
+          fi
+          {{- end }}
+
+          # Test REST API service
+          {{- if .Values.rest.enabled }}
+          echo "Testing REST API service..."
+          curl -f -s -o /dev/null http://{{ include "supabase.rest.fullname" . }}:{{ if and .Values.rest .Values.rest.service }}{{ .Values.rest.service.port | default 3000 }}{{ else }}3000{{ end }}/
+          if [ $? -eq 0 ]; then
+            echo "✅ REST API service is healthy"
+          else
+            echo "❌ REST API service health check failed"
+          fi
+          {{- end }}
+
+          # Test Storage service
+          {{- if .Values.storage.enabled }}
+          echo "Testing Storage service..."
+          curl -f -s -o /dev/null http://{{ include "supabase.storage.fullname" . }}:{{ if and .Values.storage .Values.storage.service }}{{ .Values.storage.service.port | default 5000 }}{{ else }}5000{{ end }}/status
+          if [ $? -eq 0 ]; then
+            echo "✅ Storage service is healthy"
+          else
+            echo "❌ Storage service health check failed"
+          fi
+          {{- end }}
+
+          # Test Realtime service
+          {{- if .Values.realtime.enabled }}
+          echo "Testing Realtime service..."
+          curl -f -s -o /dev/null http://{{ include "supabase.realtime.fullname" . }}:{{ if and .Values.realtime .Values.realtime.service }}{{ .Values.realtime.service.port | default 4000 }}{{ else }}4000{{ end }}/api/health
+          if [ $? -eq 0 ]; then
+            echo "✅ Realtime service is healthy"
+          else
+            echo "❌ Realtime service health check failed"
+          fi
+          {{- end }}
+
+          # Test Studio service
+          {{- if .Values.studio.enabled }}
+          echo "Testing Studio service..."
+          curl -f -s -o /dev/null http://{{ include "supabase.studio.fullname" . }}:{{ if and .Values.studio .Values.studio.service }}{{ .Values.studio.service.port | default 3000 }}{{ else }}3000{{ end }}
+          if [ $? -eq 0 ]; then
+            echo "✅ Studio service is accessible"
+          else
+            echo "❌ Studio service is not accessible"
+          fi
+          {{- end }}
+
+          echo "Supabase services test completed"

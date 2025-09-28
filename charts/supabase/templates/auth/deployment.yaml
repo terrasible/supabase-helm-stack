@@ -1,0 +1,76 @@
+{{- if .Values.auth.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "supabase.auth.fullname" . }}
+  labels:
+    {{- include "supabase.auth.labels" . | nindent 4 }}
+spec:
+  {{- if not (and .Values.auth.autoscaling .Values.auth.autoscaling.enabled) }}
+  replicas: {{ .Values.auth.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "supabase.auth.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.auth.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "supabase.auth.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.auth.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "supabase.auth.serviceAccountName" . }}
+      {{- if .Values.auth.podSecurityContext }}
+      podSecurityContext:
+        {{- include "supabase.component.podSecurityContext" (dict "Values" .Values "component" "auth" "context" .) | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ include "supabase.auth.name" . }}
+          {{- include "supabase.component.securityContext" (dict "Values" .Values "component" "auth" "context" .) | nindent 10 }}
+          image: "{{ .Values.auth.image.repository }}:{{ .Values.auth.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.auth.image.pullPolicy }}
+          command: ["gothru"]
+          env:
+            {{- range $key, $value := .Values.auth.environment }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- if .Values.db.enabled }}
+            - name: GOTHRU_DATABASE_HOST
+              value: {{ include "supabase.db.fullname" . }}
+            {{- end }}
+          {{- if and .Values.global.csi .Values.global.csi.enabled }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.csi.secretName | default "" }}
+          {{- else if .Values.global.defaultSecretName }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.defaultSecretName }}
+          {{- else }}
+          envFrom:
+            - secretRef:
+                name: {{ include "supabase.secretName" . }}
+          {{- end }}
+          {{- include "supabase.component.healthChecks" (dict "Values" .Values "component" "auth" "context" .) | nindent 10 }}
+          ports:
+            - name: http
+              containerPort: 9999
+              protocol: TCP
+          {{- include "supabase.component.resources" (dict "Values" .Values "component" "auth" "context" .) | nindent 10 }}
+          {{- with .Values.auth.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.auth.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- include "supabase.component.scheduling" (dict "Values" .Values "component" "auth" "context" .) | nindent 6 }}
+{{- end }}

@@ -1,0 +1,94 @@
+{{- if .Values.imgproxy.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "supabase.imgproxy.fullname" . }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  {{- if not (and .Values.imgproxy.autoscaling .Values.imgproxy.autoscaling.enabled) }}
+  replicas: {{ .Values.imgproxy.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "supabase.imgproxy.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.imgproxy.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "supabase.imgproxy.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imgproxy.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "supabase.imgproxy.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.imgproxy.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ include "supabase.imgproxy.name" $ }}
+          securityContext:
+            {{- toYaml .Values.imgproxy.securityContext | nindent 12 }}
+          image: "{{ .Values.imgproxy.image.repository }}:{{ .Values.imgproxy.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.imgproxy.image.pullPolicy }}
+          command: ["imgproxy"]
+          env:
+            {{- range $key, $value := .Values.imgproxy.environment }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- if and .Values.global.csi .Values.global.csi.enabled }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.csi.secretName | default "" }}
+          {{- else if .Values.global.defaultSecretName }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.defaultSecretName }}
+
+          {{- else }}
+          envFrom:
+            - secretRef:
+                name: {{ include "supabase.secretName" . }}
+
+          {{- end }}
+          {{- with .Values.imgproxy.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.imgproxy.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 5001
+              protocol: TCP
+          {{- with .Values.imgproxy.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.imgproxy.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.imgproxy.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.imgproxy.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.imgproxy.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.imgproxy.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

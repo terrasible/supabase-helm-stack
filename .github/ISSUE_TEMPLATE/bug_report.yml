@@ -1,0 +1,140 @@
+name: Bug Report
+description: File a bug report to help us improve
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report! 🐛
+
+        Please search existing issues before creating a new one to avoid duplicates.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe the bug...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Install chart with '...'
+        2. Configure '...'
+        3. Run command '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: A clear and concise description of what you expected to happen.
+      placeholder: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: A clear and concise description of what actually happened.
+      placeholder: What actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and Error Messages
+      description: Please copy and paste any relevant log output or error messages.
+      render: shell
+      placeholder: |
+        # Helm logs
+        helm install ...
+
+        # Kubernetes logs
+        kubectl logs ...
+
+        # Error messages
+        Error: ...
+
+  - type: input
+    id: chart-version
+    attributes:
+      label: Chart Version
+      description: What version of the Helm chart are you using?
+      placeholder: "v0.1.3"
+    validations:
+      required: true
+
+  - type: input
+    id: helm-version
+    attributes:
+      label: Helm Version
+      description: What version of Helm are you using?
+      placeholder: "v3.12.0"
+    validations:
+      required: true
+
+  - type: input
+    id: k8s-version
+    attributes:
+      label: Kubernetes Version
+      description: What version of Kubernetes are you using?
+      placeholder: "v1.27.0"
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: What platform/cloud provider are you using?
+      placeholder: "AWS EKS, GKE, AKS, minikube, kind, etc."
+    validations:
+      required: true
+
+  - type: textarea
+    id: values
+    attributes:
+      label: Values Configuration
+      description: Please share your values.yaml configuration (remove any sensitive information)
+      render: yaml
+      placeholder: |
+        # values.yaml
+        global:
+          environment: production
+
+        postgresql:
+          enabled: true
+
+        # ... other configuration
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here.
+      placeholder: Any additional information that might be helpful...
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      description: Please confirm the following
+      options:
+        - label: I have searched existing issues to avoid duplicates
+          required: true
+        - label: I have provided all the requested information
+          required: true
+        - label: I have removed any sensitive information from logs and configurations
+          required: true
